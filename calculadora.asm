@@ -28,6 +28,87 @@ mov ax,4c00h ; terminate program
 int 21h
 
 ;*****************************************************************
+; cmpStrChar - compare string/char
+; description -  function returns true char is in string false else if
+; input - si = string
+;         al = char
+;         cx = string size
+; output - true or false
+; destroy - nothing
+;*****************************************************************
+cmpStrChar proc
+    push dx
+    push bx
+   
+    mov dx, 0
+    
+    cmpStrCharLoop1:
+    push cx
+    inc dx
+    repne scasb 
+    
+    
+    push si
+    mov si, offset strTrue
+    cmp cx, 0
+    jne cmpStrCharItsTrue
+    mov si, offset strFalse
+    cmpStrCharItsTrue:
+    mov bx, 00H
+    call printf
+    pop si
+    
+    add SI, cx
+    add DI, cx
+    cmp dx, 3
+    pop cx
+    jne cmpStrCharLoop1
+    
+    pop bx 
+    pop dx
+    ret     
+cmpStrChar endp
+
+;*****************************************************************
+; cmpStr - compare 2 strings
+; descricao: rotina que faz a comparacao entre duas string e impre se e true or false
+; input - si = string1 
+;         di = string2
+;         cx = string size
+; output - nenhum
+; destroi - si
+;*****************************************************************
+cmpStr proc
+    push dx
+    push bx
+    
+    mov dx, 0
+    
+    cmpStrLoop1:
+    inc dx
+    repe cmpsb 
+    
+    push si
+    mov si, offset strTrue
+    cmp cx, 0
+    je cmpStrItsTrue
+    mov si, offset strFalse
+    cmpStrItsTrue:
+    mov bx, 00H
+    call printf
+    pop si
+    
+    add SI, cx
+    add DI, cx
+    cmp dx, 3
+    jne cmpStrLoop1
+    
+    pop bx 
+    pop dx
+    ret   
+cmpStr endp
+
+;*****************************************************************
 ; calculator - calculate 2 value with an operator
 ; descricao:
 ; input - none
