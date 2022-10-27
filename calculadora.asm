@@ -1,4 +1,6 @@
 data segment
+bucket dd 0
+resto dw 0
 strWelcome db "Bem vindo/a a nossa calculadora", 10, 13, 0
 strFirstNum db "Intruduza o primeiro operando: ", 0
 var1 dw ?
@@ -7,6 +9,7 @@ Op db 2 dup (?)
 strSecNum db 10, 13, "Intruduza o segundo operando: ", 0
 var2 dw ?
 strFinal db 10, 13, "O resultado e: ", 0
+strNumFinal db 5 dup(?)
 strObg db 10, 13, "Obrigado", 0
 MAXSTRSIZE equ 100
 ends
@@ -65,12 +68,13 @@ call calculatorOperator
 mov SI, offset strFinal
 mov bl, 00H
 call printf
-mov bl, 03H
+mov si, offset strNumFinal
+mov bl, 03H ;printfNum
 call printf
 
-;mov SI, offset strObg
-;mov bl, 00H
-;call printf
+mov SI, offset strObg
+mov bl, 00H
+call printf
 ret
 calculator endp
 
@@ -79,11 +83,84 @@ cmp [DI], '+'
 jne calculatorOperatorSwitch1
 mov ax, var1
 add ax, var2
-mov var1, ax
 
 calculatorOperatorSwitch1:
+cmp [DI], '-'
+jne calculatorOperatorSwitch2
+mov ax, var1
+sub ax, var2
+
+calculatorOperatorSwitch2:
+cmp [DI], '*'
+jne calculatorOperatorSwitch3
+mov ax, var1
+mov bx, var2
+call mult
+
+calculatorOperatorSwitch3:
+cmp [DI], '/'
+jne calculatorOperatorSwitch4
+mov ax, var1
+mov bx, var2
+call division
+
+calculatorOperatorSwitch4:
 ret
 calculatorOperator endp
+
+mult proc
+push bp
+mov bp, sp
+sub sp, 2
+
+mov [bp-1], 0
+mov [bp-2], 0
+
+cmp ax, bx
+ja multAxBigger
+mov dx, ax
+mov ax, bx
+mov bx, dx
+multAxBigger:
+
+multLoop1:
+add [bp-2], ax
+dec bx
+cmp bx, 0
+jz multEnd
+jmp multLoop1
+
+multEnd:
+mov ax, [bp-2]
+add sp, 2
+pop bp
+ret
+mult endp
+
+division proc
+push bp
+mov bp, sp
+push 0
+
+cmp ax, bx
+ja divisionAxBigger
+mov dx, ax
+mov ax, bx
+mov bx, dx
+divisionAxBigger:
+
+divisionLoop1:
+sub ax, bx
+inc [bp-2] ;parte inteira
+cmp ax, bx
+jb divisionEnd
+jmp divisionLoop1
+divisionEnd:
+mov ax, [bp-2]
+add sp, 2
+pop bp
+RET
+division endp
 
 ;*****************************************************************
 ; printf - string output
