@@ -1,6 +1,4 @@
 data segment
-bucket dd 0
-resto dw 0
 strWelcome db "Bem vindo/a a nossa calculadora", 10, 13, 0
 strFirstNum db "Intruduza o primeiro operando: ", 0
 var1 dw ?
