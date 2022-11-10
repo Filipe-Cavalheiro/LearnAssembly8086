@@ -28,6 +28,143 @@ mov ax,4c00h ; terminate program
 int 21h
 
 ;*****************************************************************
+; fcreate - file create
+; description -  create a file 
+; input - DX = file name location
+;         CX = file attributes
+; output - file stores in given DX location
+; destroy - nothing
+;*****************************************************************
+fcreate proc 
+    mov ah, 3Ch
+    int 21h 
+    jnc fcreateNotError 
+        mov bl, 00h
+        mov si, offset strError
+        call printf
+        ret    
+    fcreateNotError:
+    mov bx, ax
+    call fclose
+    ret
+fcreate endp
+
+;*****************************************************************
+; fopen - file open
+; description -  opens a file in (read, write, append)
+; input - DX = file name location
+;         AL = opening type (read, write, read/write)
+; output - file stores in given DX location and handeler in BX
+; destroy - ax, bx, dx
+;*****************************************************************
+fopen proc
+    push cx
+    cmp al, 03
+    jne fopenSwitch1 ;
+    mov cl, al
+    mov al, 02 ; read/write type
+    
+    fopenSwitch1: 
+    mov ah, 3Dh
+    int 21h 
+    jnc fopenNotError
+        mov bl, 00h
+        mov si, offset strError
+        call printf
+        ret 
+    fopenNotError:
+    mov bx, ax ; handler
+    
+    cmp cl, 03
+    jne fopenSwitch2
+    mov al, 02 ; EOF type
+    xor cx, cx
+    xor dx, dx
+    call fseek   
+    fopenSwitch2:
+    pop cx
+    ret
+fopen endp 
+
+;*****************************************************************
+; fclose - file close
+; description -  closes a file
+; input - BX = file handle
+; output - file stores in given DX location
+; destroy - nothing
+;*****************************************************************
+fclose proc
+    mov ah, 3Eh
+    int 21h 
+    jnc fcloseNotError
+        mov bl, 00h
+        mov si, offset strError
+        call printf 
+    fcloseNotError:
+    ret
+fclose endp
+
+;*****************************************************************
+; fseek - file seek
+; description -  set current file position
+; input - BX = file handle  
+;         AL = seek type (start of file, current file position, end of file)
+;         CX:DX = offset from origin of new file position
+; output - DX:AX = new corser position in bytes from start of file
+; destroy - nothing
+;*****************************************************************
+fseek proc
+    mov ah, 42h
+    int 21h 
+    jnc fseekNotError
+        mov bl, 00h
+        mov si, offset strError
+        call printf 
+    fseekNotError:
+    ret
+fseek endp
+
+;*****************************************************************
+; fread - read file
+; description - read to buffer cx bytes
+; input - BX = file handle  
+;         CX = number of bytes to read
+;         DS:DX = buffer data
+; output - DS:DX = buffer data, AX = bytes read
+; destroy - ax
+;*****************************************************************
+fread proc
+    mov ah, 3Fh
+    int 21h
+    jnc freadNotError
+        mov bl, 00h
+        mov si, offset strError
+        call printf 
+    freadNotError:
+    ret    
+fread endp
+
+;*****************************************************************
+; fwrite - file write
+; description - write to the file
+; input - BX = file handle  
+;         CX = number of bytes to read
+;         DS:DX = data to write
+; output - AX = number of bytes actually written
+; destroy - ax
+;*****************************************************************
+fwrite proc
+mov ah, 40h
+int 21h
+jnc fwriteNotError
+    mov bl, 00h
+    mov si, offset strError
+    call printf 
+fwriteNotError:
+ret 
+fwrite endp
+
+;*****************************************************************
 ; cmpStrChar - compare string/char
 ; description -  function returns true char is in string false else if
 ; input - si = string
