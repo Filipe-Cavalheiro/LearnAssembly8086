@@ -1,0 +1,426 @@
+data segment
+    MAXSTRSIZE equ 100      
+    GRIDCOLOR equ 27
+    SQUARECOLOR equ 15 
+    strHeader db "  gen:000 Live Cells:0000 start exit ", 0
+    xI dw 1
+    yI dw 1
+    xF dw 1
+    yF dw 1
+ends
+
+stack segment
+    dw 128 dup(0)
+ends
+
+code segment
+start:
+    mov ax, data
+    mov ds, ax
+    mov es, ax
+    
+    call initGraph
+    
+    mov si, offset strHeader
+    call printf
+    
+    mov xI, 1
+    mov yI, 11
+    mov xF, 10
+    mov yF, 20
+    call drawSquareAuto
+    
+    call drawGrid
+    
+    mov ah, 1 ; press any key
+    int 21h
+    
+mov ax,4c00h ; terminate program
+int 21h
+ends   
+
+;*****************************************************************
+; initMouse - Initiate Mouse
+; descricao: starts the mouse 
+; input - none
+; output - none
+; destroi - nothing
+;*****************************************************************
+initMouse proc
+    mov AX, 0
+    int 33h 
+    ret
+initMouse endp
+
+;*****************************************************************
+; MouseInput - 
+; descricao: 
+; input - none
+; output - multiple :)
+; destroi - ax, bx, cx, dx
+;*****************************************************************
+;MouseInput proc 
+;    MouseInputLoop1:
+;    xor bx, bx
+;    mov ax, 03
+;    int 33h
+;    cmp bx, 0
+;    je MouseInputLoop1
+;    
+;    shr cx, 1 ; divide cx because it has double of the real value 
+    
+;    cmp cx, 50
+;    jnb  MouseInputSwitch1
+;    cmp dx, 50
+;    jnb  MouseInputSwitch1
+;    cmp cx, 10
+;    jna  MouseInputSwitch1
+;    cmp dx, 10
+;    jna  MouseInputSwitch1
+;    mov si, offset str1 
+;    call printf
+;    jp MouseInputLoop1
+;    MouseInputSwitch1:
+;    mov si, offset str2 
+;    call printf
+;    
+;    cmp bx, 2
+;    jne MouseInputLoop1
+;    ret
+;MouseInput endp    
+
+;*****************************************************************
+; drawLine - draws a line
+; descricao: draws a line does put 'cursor' in next line 
+; input - none
+; output - line on the screen
+; destroi - nada
+;*****************************************************************
+drawLine proc
+    mov al, GRIDCOLOR
+    drawLineLoop1:
+    call drawPixel ; draws the line
+    inc cx
+    cmp cx, 320 
+    jne drawLineLoop1
+    xor cx, cx
+    inc dx
+    ret
+drawLine endp
+
+;*****************************************************************
+; drawColum - draws the collum
+; descricao: draws collum does put 'cursor' on the next line
+; input - none
+; output - collum on the screen
+; destroi - nada
+;*****************************************************************
+drawCollum proc
+    
+    drawCollumLoop2:
+    drawCollumLoop1:
+    mov al, GRIDCOLOR
+    call drawPixel ; draws the line
+    add cx, 10
+    cmp cx, 320 
+    jb drawCollumLoop1
+    xor cx, cx ;put on the start of the next line
+    inc dx
+    mov ax, dx
+    mov bl, 10
+    div bl
+    cmp ah, 0
+    jne drawCollumLoop2 
+     
+    ret
+drawCollum endp
+
+;*****************************************************************
+; drawGrid - draws the grid (320X200)px
+; descricao: 
+; input - none
+; output - square on the screen
+; destroi - nada
+;*****************************************************************
+drawGrid proc
+    mov al, GRIDCOLOR
+    mov cx, 0  ;x position
+    mov dx, 10 ;y position
+    
+    drawGridLoop1:
+        
+        call drawLine    
+        ;mov ax, dx
+        ;mov bl, 10
+        ;div bl
+        ;or ah,ah
+        ;jz drawGridEnd1 ; draw collum if dx%10 != 0
+        call drawCollum   
+        drawGridEnd1:
+        cmp dx, 200
+        jne drawGridLoop1
+    
+    ret 
+drawGrid endp
+
+;*****************************************************************
+; drawSquareAuto - draws a square
+; descricao: 
+; input - xI = x coord of start
+;         yI = y coord of start
+;         xF = x coord of end
+;         yF = y coord of end 
+;         al = color [0, 255]
+; output - square on the screen
+; destroi - nada
+;*****************************************************************
+drawSquareAuto proc
+    mov al, SQUARECOLOR
+    mov cx, xI
+    mov dx, yI
+    
+    drawSquareAutoLoop2:
+    drawSquareAutoLoop1:
+    call drawPixel
+    inc cx
+    cmp cx, xF 
+    jne drawSquareAutoLoop1 
+    mov cx, xI
+    inc dx
+    cmp dx, yF
+    jne drawSquareAutoLoop2 
+    ret       
+drawSquareAuto endp
+
+initGraph proc
+    mov ah, 0
+    mov al, 13h
+    int 10h
+    ret
+initGraph endp 
+
+;*****************************************************************
+; drawPixel - draws a pixel
+; descricao: 
+; input - AL = pixel color
+;         CX = column
+;         DX = row
+; output - pixel on the screen
+; destroi - nada
+;*****************************************************************
+drawPixel proc
+    mov ah, 0Ch
+    int 10h 
+    ret
+drawPixel endp  
+
+;*****************************************************************
+; getCorners - get the coords of square
+; descricao: gets top left and bottom right coords
+; input - none
+; output - xI, yI, xF, yF
+; destroi - nada
+;*****************************************************************
+getCorners proc 
+    push bx 
+    push ax 
+    
+    mov bl, 01
+    call scanf
+    mov xI, ax
+    
+    mov bl, 01
+    call scanf
+    mov yI, ax
+    
+    mov bl, 01
+    call scanf
+    mov xF, ax
+    
+    mov bl, 01
+    call scanf
+    mov yF, ax 
+    
+    call initGraph ;clean screen
+     
+    pop ax
+    pop bx
+    ret    
+getCorners endp
+
+;*****************************************************************
+; drawSquare - drawSquare
+; descricao: draws a square with user input
+; input - none
+; output - square on the screen
+; destroi - nada
+;*****************************************************************
+drawSquare proc 
+    call getCorners
+     
+    call drawSquareAuto
+   
+    ret    
+drawSquare endp    
+
+;*****************************************************************
+; scanf - string input
+; descricao: rotina que faz o input de uma string ate o char ENTER
+; input - DI = deslocamento da string a escrever desde o inicio do segmento de dados
+; output - string
+; destroi - nada
+;*****************************************************************
+scanf proc
+    cmp bl, 01h ; check if its a numb and not a string
+    jne jmpScanfNumb
+    call scanfNumb
+    jmp endScanf2
+    
+    jmpScanfNumb:
+    push ax
+    mov ax, MAXSTRSIZE
+    push ax
+    push di
+    
+    L1Scanf:
+    call getChar
+    cmp [DI-1], 0DH ; cmp with enter
+    je endScanf
+    
+    pop ax
+    dec ax
+    or ax, ax
+    push ax
+    je endScanf ; cmp with max size
+    
+    jmp L1Scanf
+    
+    endScanf:
+        mov [DI-1], 0
+        INC DI
+        pop ax
+        pop ax
+        pop di
+    endScanf2:
+    ret
+scanf endp
+
+getChar proc
+    push ax
+    mov ah, 01H
+    INT 21H
+    mov [DI], al
+    INC DI
+    pop ax
+ret
+getChar endp
+
+;*****************************************************************
+; scanfNumb - scanf for int
+; descricao:
+; input - nothing
+; output - number in int placed in AX
+; destroi - ax
+;*****************************************************************
+scanfNumb proc
+push bx
+mov ax, 0
+mov bl, 10
+
+L1ScanfNumb:
+call getChar
+cmp [DI-1], 0DH ; cmp with enter
+je endScanfNumb
+mul bl
+sub [DI-1], 30H
+add al, [DI-1]
+jmp L1ScanfNumb
+
+endScanfNumb:
+pop bx
+ret
+scanfNumb endp 
+
+;*****************************************************************
+; printf - string output
+; descricao: rotina que faz o output de uma string NULL terminated para o ecra
+; input - si = deslocamento da string a escrever desde o inicio do segmento de dados
+; output - nenhum
+; destroi - si
+;*****************************************************************
+printf proc
+
+L1Printf: mov al,byte ptr [si]
+or al,al
+jz fimprtstr
+call co
+inc si
+jmp L1Printf
+fimprtstr:
+ret
+printf endp
+
+;*****************************************************************
+; printfNum - put number in string
+; descricao:
+; input - SI= start of string
+;         AX = number to be printed
+; output - nenhum
+; destroi - nada
+;*****************************************************************
+printfNum proc
+push bx
+push si
+mov cx, 0
+
+L1PrintfNum:
+mov bl, 10
+div bl
+inc cx
+mov dl, al
+mov al, 00H
+add ah, '0'
+push ax
+mov al, dl
+mov ah, 00H
+cmp al, 0
+je endL1PrintfNum
+jmp L1PrintfNum
+
+endL1PrintfNum:
+L2PrintfNum:
+dec cx
+pop ax
+mov [si], ah
+INC SI
+cmp cx, 0
+je endL2PrintfNum
+jmp L2PrintfNum
+endL2PrintfNum:
+
+mov [SI], 00H
+pop si
+pop bx
+ret
+printfNum endp
+
+;*****************************************************************
+; co - caracter output
+; descricao: rotina que faz o output de um caracter para o ecra
+; input - al=caracter a escrever
+; output - nenhum
+; destroi - nada
+;*****************************************************************
+co proc
+push ax
+push dx
+mov ah,02H
+mov dl,al
+int 21H
+pop dx
+pop ax
+ret
+co endp
+
+
+end start
