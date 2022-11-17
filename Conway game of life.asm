@@ -52,6 +52,24 @@ initMouse proc
 initMouse endp
 
 ;*****************************************************************
+; getMousePos - get Mouse Position
+; description:  
+; input - none
+; output - BX = Button pressed (1 - botao da esquerda, 2 - botao da direita e  3 ambos os botoes)
+; 	       CX = horizontal position (column)
+; 	       DX = Vertical position (row)
+; destroy - nothing
+;*****************************************************************
+getMousePos proc
+    push ax
+	mov ax,03h
+	int 33h
+	pop ax
+	ret
+
+getMousePos endp
+
+;*****************************************************************
 ; initGraph - Initiate Graph
 ; description: starts the graph interface 
 ; input - none
