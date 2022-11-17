@@ -2,7 +2,13 @@ data segment
     MAXSTRSIZE equ 100      
     GRIDCOLOR equ 27
     SQUARECOLOR equ 15 
-    strHeader db "  gen:000 Live Cells:0000 start exit", 0
+    strHeader db "gen:000 Live Cells:0000 start exit$"
+    strMenu db "Main  Menu$"
+    strPlay db "Play$"
+    strLoad db "Load$"
+    strTop5 db "Top  5$"
+    strCredits db "*Credits$"
+    strExit db "Exit$"
     xI dw 1
     yI dw 1
     xF dw 1
@@ -18,6 +24,12 @@ start:
     mov ax, data
     mov ds, ax
     mov es, ax
+    
+    call startMenu
+             
+    call clearGraph
+        
+    call drawGrid
         
     mov ah, 1 ; press any key
     int 21h
@@ -34,7 +46,7 @@ ends
 ; destroy - nothing
 ;*****************************************************************
 initMouse proc
-    mov AX, 0
+    xor ax, ax
     int 33h 
     ret
 initMouse endp
@@ -47,11 +59,25 @@ initMouse endp
 ; destroy - nothing
 ;*****************************************************************
 initGraph proc
-    mov ah, 0
+    xor ah, ah
     mov al, 13h
     int 10h
     ret
 initGraph endp
+
+clearGraph proc
+    push ax
+	mov ah,06
+	mov al,00
+	mov BH,00 ; attributes to be used on blanked lines
+	mov cx,0 ; CH,CL = row,column of upper left corner of window to scroll
+	mov DH,25 ;= row,column of lower right corner of window
+	mov DL,40
+	int 10h
+	pop ax
+	ret
+
+clearGraph endp
 
 ;*****************************************************************
 ; drawLine - draws a line
@@ -107,6 +133,14 @@ drawCollum endp
 ; destroi - nada
 ;*****************************************************************
 drawGrid proc
+    mov dh, 0
+    mov dl, 3
+    mov bl, 0
+    call setCursorPosition
+    
+    push offset strHeader
+    call printf
+    
     mov al, GRIDCOLOR
     mov cx, 0  ;x position
     mov dx, 10 ;y position
@@ -163,7 +197,7 @@ drawFilledSquare endp
 ;         CX = column
 ;         DX = row
 ; output - pixel on the screen
-; destroi - nada
+; destroi - ah
 ;*****************************************************************
 drawPixel proc
     mov ah, 0Ch
@@ -275,20 +309,19 @@ co proc
 co endp
 
 ;*****************************************************************
-; printf - string output
-; descricao: rotina que faz o output de uma string NULL terminated para o ecra
-; input - si = deslocamento da string a escrever desde o inicio do segmento de dados
-; output - nenhum
-; destroi - si
-;*****************************************************************
+; printf - prints a string to the screen
+; descricao: rotine that prints a string to the screen
+; input - dx = offset of sting to print  
+; output - nada
+; destroi - nada
+;*****************************************************************    
 printf proc
-    L1Printf: mov al,byte ptr [si]
-    or al,al
-    jz fimprtstr
-    call co
-    inc si
-    jmp L1Printf
-    fimprtstr:
+    push ax
+    
+    mov ah, 9
+    int 21h
+    
+    pop ax
     ret
 printf endp
 
@@ -333,7 +366,7 @@ printfNum proc
     mov [SI], 00H
     pop si
     pop bx
-    ret
+   ret
 printfNum endp
 
 ;*****************************************************************
@@ -343,85 +376,94 @@ printfNum endp
 ; output - nada
 ; destroy - ax, dx
 ;*****************************************************************     
-    startMenu proc
+startMenu proc
 
-        call initGraphicMode
-        
-        xor bh, bh
-        mov dh, 1
-        mov dl, 15
-        call setCursorPosition
-        
-        push offset strMenu
-        call printf
-        
-        xor bh, bh
-        mov dh, 7
-        mov dl, 18
-        call setCursorPosition
-        
-        push offset strPlay
-        call printf
-        
-        xor bh, bh
-        mov dh, 11
-        mov dl, 18
-        call setCursorPosition
-        
-        push offset strLoad
-        call printf
-        
-        xor bh, bh
-        mov dh, 15
-        mov dl, 17
-        call setCursorPosition
-        
-        push offset strTop5
-        call printf
-        
-        xor bh, bh
-        mov dh, 19
-        mov dl, 16
-        call setCursorPosition
-        
-        push offset strCredits
-        call printf
-        
-        xor bh, bh
-        call getCursorSizePosition
-        
-        push 30         ; push square color
-        push 59         ; push center of y coordinate
-        call constructButtonCenterX
-        
-        push 30         ; push square color
-        push 91         ; push center of y coordinate
-        call constructButtonCenterX
-                        
-        push 30         ; push square color
-        xor ah, ah
-        mov ax, 123
-        push ax        ; push center of y coordinate
-        call constructButtonCenterX
-        
-        push 30         ; push square color
-        xor ah, ah
-        mov ax, 155
-        push ax        ; push center of y coordinate
-        call constructButtonCenterX
-        
-        startLoop:
-            
-            call ci
-            cmp al, 0dh
-            je endLoop
-            
-            jmp startLoop
-        endLoop:
-        
-        ret
-    startMenu endp
+    call initGraph
     
+    xor bh, bh
+    mov dh, 1
+    mov dl, 15
+    call setCursorPosition
+    
+    lea dx, strMenu
+    call printf
+    
+    mov dh, 5
+    mov dl, 18
+    call setCursorPosition
+    
+    lea dx, strPlay
+    call printf
+    
+    mov dh, 9
+    mov dl, 18
+    call setCursorPosition
+    
+    lea dx, strLoad
+    call printf
+    
+    mov dh, 13
+    mov dl, 17
+    call setCursorPosition
+    
+    lea dx, strTop5
+    call printf
+    
+    mov dh, 17
+    mov dl, 16
+    call setCursorPosition
+    
+    lea dx, strCredits
+    call printf
+    
+    mov dh, 21
+    mov dl, 18
+    call setCursorPosition
+    
+    lea dx, strExit
+    call printf
+    
+    xor bh, bh
+    call getCursorSizePosition
+    
+    push 30         ; push square color
+    push 43         ; push center of y coordinate
+    call constructButtonCenterX
+    
+    push 30         ; push square color
+    push 75         ; push center of y coordinate
+    call constructButtonCenterX
+                    
+    push 30         ; push square color
+    xor ah, ah
+    mov ax, 107
+    push ax        ; push center of y coordinate
+    call constructButtonCenterX
+    
+    push 30         ; push square color
+    xor ah, ah
+    mov ax, 139
+    push ax        ; push center of y coordinate
+    call constructButtonCenterX
+    
+    push 30         ; push square color
+    xor ah, ah
+    mov ax, 171
+    push ax        ; push center of y coordinate
+    call constructButtonCenterX
+    
+    startLoop:
+        
+        call ci
+        cmp al, 0dh
+        je endLoop
+        
+        jmp startLoop
+    endLoop:
+    
+    ret
+startMenu endp    
+
 ;*****************************************************************
 ; constructButtonCenterX - Buttons on the center of the x position
 ; descricao: creates a button on the center of the screen in the x position
@@ -459,9 +501,8 @@ printfNum endp
         
         pop bp
         ret 4
-    constructButtonCenterX endp 
+    constructButtonCenterX endp
     
-
 ;*****************************************************************
 ; ci - input character
 ; descricao: Le um input do utilizador
@@ -476,7 +517,7 @@ printfNum endp
         
         ret    
     ci endp
-
+    
 ;*****************************************************************
 ; printSquare - draws a square on screen
 ; descricao: rotina que desenha as bordas de um quadrado para o ecra em modo grafico
@@ -511,7 +552,6 @@ printfNum endp
                 
                 jb NotSkip                
                     jmp endPaintSquareLoop
-                    
             NotSkip:
                                             ; push cor do quadrado para usar em paint
                 push [bp + 12]              ; posicao nao estatica inicial
@@ -559,24 +599,22 @@ printfNum endp
         mov bp, sp
         add bp, 2
         
+        mov al, [bp + 12] ; faz load da cor do quadrado para o al
+        
         mov cx, [bp + 10] ; move x1 para cx
         add cx, [bp + 2]  ; soma x1 com delta x
         
         cmp cx, [bp + 6]  ; compara x2 com xi            
         ja skipPaint2PX
         
-        push [bp + 12]             ; push cor do quadrado para usar em paint
-        push [bp + 8]              ; push da posicao y onde desenhar o pixel
-        push cx                    ; push da posicao x onde desenhar o pixel
-        call paintPixel
+        mov dx, [bp + 8]  ; mov da posicao y onde desenhar o pixel para dx
+        call drawPixel
         
         mov cx, [bp + 6] ; move x2 para cx
         sub cx, [bp + 2] ; subtracao de x2 com delta x
         
-        push [bp + 12]             ; push cor do quadrado para usar em paint
-        push [bp + 4]              ; push da posicao y onde desenhar o pixel
-        push cx                    ; push da posicao x onde desenhar o pixel                
-        call paintPixel
+        mov dx, [bp + 4] ; mov da posicao y onde desenhar o pixel para dx
+        call drawPixel
         
         skipPaint2PX:
         pop bp
@@ -601,71 +639,29 @@ printfNum endp
         mov bp, sp
         add bp, 2
         
-        mov cx, [bp + 10] ; move x1 para cx
-        add cx, [bp + 2]  ; soma x1 com delta x
+        mov al, [bp + 12] ; move da cor do quadrado para al
         
-        cmp cx, [bp + 6]  ; compara x2 com xi            
+        mov dx, [bp + 10] ; move y1 para dx
+        add dx, [bp + 2]  ; soma y1 com delta y
+        
+        cmp dx, [bp + 6]  ; compara y2 com yi            
         ja skipPaint2PY
         
-        push [bp + 12]             ; push cor do quadrado para usar em paint
-        push cx                    ; push da posicao y onde desenhar o pixel
-        push [bp + 8]              ; push da posicao x onde desenhar o pixel
-        call paintPixel
+        mov cx, [bp + 8]  ; mov da posicao x onde desenhar o pixel para cx
+        call drawPixel
         
-        mov cx, [bp + 6] ; move x2 para cx
-        sub cx, [bp + 2] ; subtracao de x2 com delta x
+        mov dx, [bp + 6]  ; move x2 para cx
+        sub dx, [bp + 2]  ; subtracao de x2 com delta x
         
-        push [bp + 12]             ; push cor do quadrado para usar em paint
-        push cx                    ; push da posicao y onde desenhar o pixel
-        push [bp + 4]              ; push da posicao x onde desenhar o pixel                
-        call paintPixel
+        mov cx, [bp + 4]  ; mov da posicao x onde desenhar o pixel para cx                
+        call drawPixel
         
         skipPaint2PY:
         pop bp
         ret 12
     paint2PixelsY endp
+    
 
-;*****************************************************************
-; initGraphicMode - initializes graphic mode
-; descricao: inicia/limpa a primaeira pagina do modo grafico
-; input - nada   
-; output - nenhum
-; destroi - nada
-;*****************************************************************    
-    initGraphicMode proc
-        push ax
-        xor ah, ah
-        mov al, 13h
-        int 10h
-        pop ax
-        ret
-    initGraphicMode endp
-
-;*****************************************************************
-; paintPixel - pinta um pixel do ecra no modo grafico
-; descricao: rotina que pinta um pixel do ecra da cor passada
-; input - cor com que pintar o pixel, posicao do pixel a pintar
-;         push 1 - cor
-;         push 2 - posicao x do pixel
-;         push 3 - posicao y do pixel  
-; output - nenhum
-; destroi - cx, dx e al
-;*****************************************************************    
-    paintPixel proc
-        push bp
-        mov bp, sp       
-        
-        mov al, [bp + 8] ; pixel color
-        mov dx, [bp + 6] ; pixel y position
-        mov cx, [bp + 4] ; pixel x position
-        
-        mov ah, 0ch
-        int 10h
-                      
-        pop bp
-        ret 6
-    paintPixel endp
-     
 ;*****************************************************************
 ; getSystemDateTime - Gets system date and time
 ; descricao: rotine that gets the system date and time
@@ -686,7 +682,7 @@ printfNum endp
         
         ret
     getSystemDateTime endp
-       
+    
 ;*****************************************************************
 ; getSystemTime - Gets system time
 ; descricao: rotine that gets the system time
@@ -707,7 +703,7 @@ printfNum endp
         pop ax
         ret
     getSystemTime endp
-           
+    
 ;*****************************************************************
 ; getSystemDate - Gets system date
 ; descricao: rotine that gets the system date
@@ -748,7 +744,7 @@ printfNum endp
         pop ax
         ret
     getCursorSizePosition endp
-    
+
 ;*****************************************************************
 ; setCursorSizePosition - Cursor size and position
 ; descricao: rotine that gets the size and position of cursor
@@ -768,28 +764,5 @@ printfNum endp
         pop ax
         ret 
     setCursorPosition endp
-    
-;*****************************************************************
-; printf - prints a string to the screen
-; descricao: rotine that prints a string to the screen
-; input - offset of the string position in memory
-;         push 1  
-; output - nada
-; destroi - dx
-;*****************************************************************    
-    printf proc
-        push bp
-        mov bp, sp
-        add bp, 2
-        push ax
-        
-        mov dx, [bp + 2]
-        mov ah, 9
-        int 21h
-        
-        pop ax
-        pop bp
-        ret 2
-    printf endp
-
+  
 end start
