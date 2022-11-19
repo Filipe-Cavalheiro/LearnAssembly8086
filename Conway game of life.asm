@@ -6,9 +6,12 @@ data segment
     strMenu db "Main  Menu$"
     strPlay db "Play$"
     strLoad db "Load$"
+    strSave db "Save$"
     strTop5 db "Top  5$"
     strCredits db "*Credits$"
     strExit db "Exit$"
+    strDiogo db "Diogo Matos Novais  n", 0A7h, " 62506$"
+    strFilipe db "Filipe Silva Cavalheiro n", 0A7h, " 62894$"
     xI dw 1
     yI dw 1
     xF dw 1
@@ -25,17 +28,15 @@ start:
     mov ds, ax
     mov es, ax
     
-    call startMenu
-             
-    call clearGraph
-        
-    call drawGrid
-        
-    mov ah, 1 ; press any key
-    int 21h
+    call initGraph
     
-mov ax,4c00h ; terminate program
-int 21h
+    loop1:
+        call startMenu
+        call initGraph
+    jmp loop1
+    
+    mov ax,4c00h ; terminate program
+    int 21h
 ends   
 
 ;*****************************************************************
@@ -83,6 +84,13 @@ initGraph proc
     ret
 initGraph endp
 
+;*****************************************************************
+; clearGraph - clear the screen
+; description: rotine that clears the screen 
+; input - none
+; output - none
+; destroy - nothing
+;*****************************************************************
 clearGraph proc
     push ax
 	mov ah,06
@@ -166,11 +174,6 @@ drawGrid proc
     drawGridLoop1:
         
         call drawLine    
-        ;mov ax, dx
-        ;mov bl, 10
-        ;div bl
-        ;or ah,ah
-        ;jz drawGridEnd1 ; draw collum if dx%10 != 0
         call drawCollum   
         drawGridEnd1:
         cmp dx, 200
@@ -391,12 +394,113 @@ printfNum endp
 ; stratMenu - Game main menu
 ; descricao: Creates and opens the main menu 
 ; input - nada   
-; output - nada
-; destroy - ax, dx
+; output - ah
+; destroy - dx, bx
 ;*****************************************************************     
 startMenu proc
+    
+    call printMenuStr
+    
+    call paintMenuSqrs           ; os quadrados tem todos a mesma posicao inicial e final no eixo dos x
+    
+    startLoop:
+        
+        call getMousePos
+        shr cx, 1
+         
+        cmp bl, 1
+        jne skipButtons      
+            mov ah, 1
+            
+            cmp cx, 119          ; como os quadrados tem todos a mesma posicao no eixo x
+            jbe skipButtons      ; so e preciso verificar 1 vez se estamos no sitio certo para clicar nos
+            cmp cx, 199          ; quadrados antes de verificar o quadrado que estamos a clicar
+            jae skipButtons
+            
+            call clickMenu
+            
+            or ah, ah
+            jz endStartLoop
+             
+        skipButtons:        
+        jmp startLoop
+    endStartLoop:
+    
+    ret
+startMenu endp
 
-    call initGraph
+;*****************************************************************
+; clickMenu - Click main menu
+; descricao: Implements the buttons for the main menu 
+; input - dx   
+; output - nada
+; destroy - dx, bx
+;*****************************************************************
+clickMenu proc
+    xor ah, ah          
+    
+    cmp dx, 35
+    jbe skipButton1
+    cmp dx, 51
+    jae skipButton1
+        
+    ret
+    skipButton1:
+    
+    cmp dx, 59
+    jbe skipButton2
+    cmp dx, 75
+    jae skipButton2
+              
+    ret       
+    skipButton2:
+    
+    cmp dx, 83
+    jbe skipButton3
+    cmp dx, 99
+    jae skipButton3
+              
+    ret       
+    skipButton3:
+    
+    cmp dx, 107
+    jbe skipButton4
+    cmp dx, 123
+    jae skipButton4
+         
+    ret             
+    skipButton4:
+    
+    cmp dx, 131
+    jbe skipButton5
+    cmp dx, 147
+    jae skipButton5
+    
+    call rollCredits
+    ret
+    skipButton5:
+             
+    cmp dx, 155
+    jbe skipButton6
+    cmp dx, 171
+    jae skipButton6
+    
+    call endProgram
+    ret
+    skipButton6:
+    
+    inc ah
+    ret
+clickMenu endp
+
+;*****************************************************************
+; printMenuStr - Print Menu strings
+; descricao: Prints the strings that are on the main menu to their propper position 
+; input - nada   
+; output - nada
+; destroy - bx, dx
+;*****************************************************************
+printMenuStr proc
     
     xor bh, bh
     mov dh, 1
@@ -413,14 +517,21 @@ startMenu proc
     lea dx, strPlay
     call printf
     
-    mov dh, 9
+    mov dh, 8
     mov dl, 18
     call setCursorPosition
     
     lea dx, strLoad
     call printf
     
-    mov dh, 13
+    mov dh, 11
+    mov dl, 18
+    call setCursorPosition
+    
+    lea dx, strSave
+    call printf
+    
+    mov dh, 14
     mov dl, 17
     call setCursorPosition
     
@@ -434,28 +545,40 @@ startMenu proc
     lea dx, strCredits
     call printf
     
-    mov dh, 21
+    mov dh, 20
     mov dl, 18
     call setCursorPosition
     
     lea dx, strExit
     call printf
     
-    xor bh, bh
-    call getCursorSizePosition
+    ret
+printMenuStr endp
+
+;*****************************************************************
+; paintMenuSqrs - Paint Menu squares
+; descricao: Paints the squares that are on the main menu to their propper position 
+; input - nada   
+; output - nada
+; destroy - nada
+;*****************************************************************
+paintMenuSqrs proc
+    push ax
     
     push 30         ; push square color
     push 43         ; push center of y coordinate
     call constructButtonCenterX
     
     push 30         ; push square color
-    push 75         ; push center of y coordinate
+    push 67         ; push center of y coordinate
     call constructButtonCenterX
                     
     push 30         ; push square color
-    xor ah, ah
-    mov ax, 107
-    push ax        ; push center of y coordinate
+    push 91         ; push center of y coordinate
+    call constructButtonCenterX
+    
+    push 30         ; push square color
+    push 115         ; push center of y coordinate
     call constructButtonCenterX
     
     push 30         ; push square color
@@ -466,21 +589,13 @@ startMenu proc
     
     push 30         ; push square color
     xor ah, ah
-    mov ax, 171
+    mov ax, 163
     push ax        ; push center of y coordinate
     call constructButtonCenterX
     
-    startLoop:
-        
-        call ci
-        cmp al, 0dh
-        je endLoop
-        
-        jmp startLoop
-    endLoop:
-    
+    pop ax
     ret
-startMenu endp    
+paintMenuSqrs endp
 
 ;*****************************************************************
 ; constructButtonCenterX - Buttons on the center of the x position
@@ -497,20 +612,20 @@ startMenu endp
         add bp, 2
         
         mov dx, [bp + 2] ; move of the center of y position to ax
-        sub dx, 10
+        sub dx, 8
         
         push [bp + 4]   ; push da cor a ser usada para pintar o quadrado
         
         xor ah, ah
-        mov ax, 119
+        mov ax, 125
         push ax         ; push da posicao x1 do quadrado
         
         push dx         ; push da posicao y1 do quadrado
         
-        add dx, 20
+        add dx, 16
         
         xor ah, ah
-        mov ax, 199     ; push da posicao x2 do quadrado
+        mov ax, 195     ; push da posicao x2 do quadrado
         push ax
         
         push dx         ; push da posicao y2 do quadrado
@@ -562,7 +677,7 @@ startMenu endp
             
             cmp cx, [bp + 4]  ; compare cx com y2
             
-            jb NotSkip
+            jbe NotSkip
                 mov cx, [bp + 10] ; move x1 para cx
                 add cx, [bp - 2]  ; soma x1 com delta x
                 
@@ -679,6 +794,39 @@ startMenu endp
         ret 12
     paint2PixelsY endp
     
+;*****************************************************************
+; rollCredits - roll credits
+; descricao: rotine that "rolls" the credits
+; input - nada  
+; output - nada
+; destroi - dx, bx
+;*****************************************************************
+rollCredits proc
+    push ax
+    
+    call initGraph
+    
+    xor bh, bh
+    mov dh, 11
+    mov dl, 6
+    call setCursorPosition
+    
+    lea dx, strDiogo
+    call printf
+    
+    mov dh, 13
+    mov dl, 4
+    call setCursorPosition
+    
+    lea dx, strFilipe
+    call printf
+    
+    call waitOrInput
+    
+    pop ax
+    ret
+rollCredits endp
+    
 
 ;*****************************************************************
 ; getSystemDateTime - Gets system date and time
@@ -716,7 +864,7 @@ startMenu endp
         push ax
         
         mov ah, 2CH
-        int 21H
+        int 21h
         
         pop ax
         ret
@@ -782,5 +930,153 @@ startMenu endp
         pop ax
         ret 
     setCursorPosition endp
+    
+;*****************************************************************
+; waitOrInput - wait 10 seconds or for user inpur
+; descricao: rotine waits 10 seconds before ending or waits for user input instead
+; input - nada  
+; output - nada
+; destroi - bx, dx
+;*****************************************************************    
+waitOrInput proc
+    
+    call getSystemTime
+    mov bh, dh
+    
+    waitOrInputLoop:
+    
+        call getSystemTime
+    
+        sub dh, bh
+        cmp dh, 10
+        jae endWaitOrInputLoop
+        
+        call getCharFromBuffer
+        jnz endWaitOrInputLoop
+    
+    jmp waitOrInputLoop
+    endWaitOrInputLoop:
+    
+    ret
+waitOrInput endp
+
+;*****************************************************************
+; getCharFromBuffer - get character form keyboard buffer
+; descricao: rotine that gets a char from the keyboard buffer
+; input - nada  
+; output - ZF set a 0 se houver character e retorna em al
+; destroi - ax
+;*****************************************************************    
+getCharFromBuffer proc
+    push dx  
+    
+    mov ah, 6
+    mov dl, 255
+    int 21h
+    
+    pop dx
+    ret
+getCharFromBuffer endp    
+
+;*****************************************************************
+; endProgram - End program
+; descricao: rotine that returns control to the opperating system
+; input - nada  
+; output - nada
+; destroi - everything
+;*****************************************************************    
+endProgram proc
+    mov ax, 4c00h
+    int 21h
+    ret
+endProgram endp
+
+;*****************************************************************
+; printfNum - put number in a string
+; descricao:
+; input - SI = start of string
+;         AX = number to be printed
+; output - nenhum
+; destroi - cx, dx, ax e si
+;*****************************************************************
+strToInt proc
+        push bx
+        xor cx, cx
+        mov bx, 10
+        
+        strToIntLoop1:
+            
+            inc cx
+            xor dx, dx
+            
+            div bx
+            add dx, 30h
+            push dx
+            
+            or ax, ax
+            jz strToIntEndLoop1
+        
+            jmp strToIntLoop1
+        strToIntEndLoop1:
+        
+        
+        strToIntLoop2:
+            
+            pop dx
+            mov [si], dl
+            inc si
+            
+        loop strToIntLoop2
+        
+        mov [si], 0
+        pop bx
+        ret
+strToInt endp
+
+;*****************************************************************
+; copyToStr - copies a string into another
+; descricao: copy an entire string onto a part of another
+; input - si = start of string to copy (must end with 0)
+;         di = where to satart copying to in destination string (lea of string if beggining lea of string + 3 if 3 bytes after the beggining of string)
+; output - nenhum
+; destroi - dl, si, di 
+;*****************************************************************
+copyToStr proc
+    
+    copyToStrLoop:
+    
+        mov dl, [si]
+        or dl, dl
+        jz copyToStrEndLoop
+        
+        mov [di], dl
+        inc di
+        inc si
+        
+        jmp copyToStrLoop
+    copyToStrEndLoop: 
+    
+    ret    
+copyToStr endp
+
+;*****************************************************************
+; clearString - clears part of a string
+; descricao:
+; input - si = where to start clearing the string 
+;         cx = number of bytes to clear from string
+; output - nenhum
+; destroi - si, cx 
+;*****************************************************************
+clearString proc
+    
+    clearStringLoop:
+        
+        mov [si], 0
+        inc si
+        
+    loop clearStringLoop
+      
+    ret 
+clearString endp
   
 end start
