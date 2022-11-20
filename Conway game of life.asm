@@ -53,6 +53,38 @@ initMouse proc
 initMouse endp
 
 ;*****************************************************************
+; clickGrid - Click Grid
+; description: Draws a 2X2 square where you click 
+; input - none
+; output - none
+; destroy - nothing
+;*****************************************************************
+clickGrid proc
+    clickGridLoop1:
+        call getMousePos
+        cmp bx, 02 ; on right click leave proc
+        je clickGridEnd1
+    
+    cmp bx, 01 ; on left click
+    jne clickGridLoop1
+        cmp dx, 10
+        jb clickGridLoop1
+        
+        shr cx, 2
+        shl cx, 1
+        
+        shr dx, 1
+        shl dx, 1
+        
+        mov al, SQUARECOLOR
+        call drawFilledSquare        
+    jmp clickGridLoop1
+          
+    clickGridEnd1:
+    ret
+clickGrid endp
+
+;*****************************************************************
 ; getMousePos - get Mouse Position
 ; description:  
 ; input - none
