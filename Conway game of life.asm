@@ -1,7 +1,9 @@
 data segment
-    MAXSTRSIZE equ 100      
+    MAXSTRSIZE equ 100
     GRIDCOLOR equ 27
-    SQUARECOLOR equ 15
+	SQUARECOLOR equ 15
+	MAXCOLLUM equ 320
+	MAXLINE equ 200
     handler dw 0
     logFile db "C:\ConwayGame\Log.txt", 0
     strOpenError db "Error on open: $"
@@ -65,6 +67,152 @@ start:
     int 21h
 ends
 
+;*****************************************************************
+; checkPixel - Check Pixel
+; description: checks if pixel is 'dead' or 'alive'
+; input - CX = x coord
+;         DX = y coord
+; output - color in AL
+; destroy - al
+;*****************************************************************
+checkPixel proc
+mov ah, 0Dh
+int 10h
+ret
+checkPixel endp
+
+;*****************************************************************
+; storeNextGen - store Next Gen
+; description: stores next gen in nextGen
+; input - none
+; output - next gen in var nextGen
+; destroy - ax, bx, cx, dx, si
+;*****************************************************************
+storeNextGen proc
+lea si, nextGen
+xor cx, cx
+mov dx, 10
+
+storeNextGenLoop1:
+xor bx,bx
+
+storeNextGenEnd1:
+sub cx, 2
+call checkPixel         ;\\\
+cmp al, SQUARECOLOR     ;0X\
+jne storeNextGenSwich1  ;\\\
+inc bx
+storeNextGenSwich1:
+sub dx, 2
+call checkPixel         ;0\\
+cmp al, SQUARECOLOR     ;\X\
+jne storeNextGenSwich2  ;\\\
+inc bx
+storeNextGenSwich2:
+add cx, 2
+call checkPixel         ;\0\
+cmp al, SQUARECOLOR     ;\X\
+jne storeNextGenSwich3  ;\\\
+inc ax
+storeNextGenSwich3:
+add cx, 2
+call checkPixel         ;\\0
+cmp al, SQUARECOLOR     ;\X\
+jne storeNextGenSwich4  ;\\\
+inc bx
+storeNextGenSwich4:
+add dx, 2
+call checkPixel         ;\\\
+cmp al, SQUARECOLOR     ;\X0
+jne storeNextGenSwich5  ;\\\
+inc bx
+storeNextGenSwich5:
+add dx, 2
+call checkPixel         ;\\\
+cmp al, SQUARECOLOR     ;\X\
+jne storeNextGenSwich6  ;\\0
+inc bx
+storeNextGenSwich6:
+sub cx, 2
+call checkPixel         ;\\\
+cmp al, SQUARECOLOR     ;\X\
+jne storeNextGenSwich7  ;\0\
+inc bx
+storeNextGenSwich7:
+sub cx, 2
+call checkPixel         ;\\\
+cmp al, SQUARECOLOR     ;\X\
+jne storeNextGenSwich8  ;0\\
+inc bx
+storeNextGenSwich8:
+add cx, 2
+sub dx, 2
+
+call checkPixel
+cmp al, SQUARECOLOR
+jne storeNextGenEnd2        ; if dead just check if it can be born
+
+cmp bx, 1
+jbe storeNextGenSwich9
+mov [si], 0
+jmp storeNextGenEnd3  ; if 1 or 0 => kill
+storeNextGenSwich9:
+
+cmp bx, 3
+jbe storeNextGenSwich10
+mov [si], 0
+jmp storeNextGenEnd3  ; if 2 or 3 => survive
+storeNextGenSwich10:
+
+
+mov [si], 0             ; more than 3 => kill
+jmp storeNextGenEnd3
+
+storeNextGenEnd2:
+cmp bx, 3                   ; if 3 => born
+jne storeNextGenEnd3
+mov [si], 1
+
+
+storeNextGenEnd3:
+
+inc si
+cmp cx, MAXCOLLUM           ; check if end of screen
+jbe storeNextGenLoop1
+cmp dx, MAXLINE
+jbe storeNextGenLoop1
+
+ret
+storeNextGen endp
+
+;*****************************************************************
+; saveGen - Save Gen
+; description: saves current gen
+; input - none
+; output - current gen in var nextGen
+; destroy - si, bx, cx, dx
+;*****************************************************************
+saveGen proc
+lea si, nextGen
+xor cx, cx
+mov dx, 10
+saveGenLoop1:
+call checkPixel
+mov [si], 1
+cmp al, SQUARECOLOR
+je saveGenEnd1
+mov [si], 0
+saveGenEnd1:
+add cx, 2
+inc si
+cmp cx, MAXCOLLUM
+jbe saveGenLoop1
+xor cx, cx
+add dx, 2
+cmp dx, MAXLINE
+jbe saveGenLoop1
+ret
+saveGen endp
 
 ;*****************************************************************
 ; initGraph - Initiate Graph
@@ -476,80 +624,391 @@ returnOs endp
 
 
   
+data segment
+MAXSTRSIZE equ 100
+GRIDCOLOR equ 27
+SQUARECOLOR equ 15
+MAXCOLLUM equ 320
+MAXLINE equ 200
+strHeader db "gen:000 Live Cells:0000 start exit$"
+strMenu db "Main  Menu$"
+strPlay db "Play$"
+strLoad db "Load$"
+strTop5 db "Top  5$"
+strCredits db "*Credits$"
+strExit db "Exit$"
+nextGen db 14400 dup(?)
+ends
+
+
+stack segment
+dw 128 dup(0)
+ends
+
+code segment
+start:
+mov ax, data
+mov ds, ax
+mov es, ax
+
+call initGraph
+
+call initMouse
+
+call clickGrid
+
+mov ax,4c00h ; terminate program
+int 21h
+ends
+
+;*****************************************************************
+; checkPixel - Check Pixel
+; description: checks if pixel is 'dead' or 'alive'
+; input - CX = x coord
+;         DX = y coord
+; output - color in AL
+; destroy - al
+;*****************************************************************
+checkPixel proc
+mov ah, 0Dh
+int 10h
+ret
+checkPixel endp
+
+;*****************************************************************
+; storeNextGen - store Next Gen
+; description: stores next gen in nextGen
+; input - none
+; output - next gen in var nextGen
+; destroy - ax, bx, cx, dx, si
+;*****************************************************************
+storeNextGen proc
+lea si, nextGen
+xor cx, cx
+mov dx, 10
+
+storeNextGenLoop1:
+xor bx,bx
+
+storeNextGenEnd1:
+sub cx, 2
+call checkPixel         ;\\\
+cmp al, SQUARECOLOR     ;0X\
+jne storeNextGenSwich1  ;\\\
+inc bx
+storeNextGenSwich1:
+sub dx, 2
+call checkPixel         ;0\\
+cmp al, SQUARECOLOR     ;\X\
+jne storeNextGenSwich2  ;\\\
+inc bx
+storeNextGenSwich2:
+add cx, 2
+call checkPixel         ;\0\
+cmp al, SQUARECOLOR     ;\X\
+jne storeNextGenSwich3  ;\\\
+inc ax
+storeNextGenSwich3:
+add cx, 2
+call checkPixel         ;\\0
+cmp al, SQUARECOLOR     ;\X\
+jne storeNextGenSwich4  ;\\\
+inc bx
+storeNextGenSwich4:
+add dx, 2
+call checkPixel         ;\\\
+cmp al, SQUARECOLOR     ;\X0
+jne storeNextGenSwich5  ;\\\
+inc bx
+storeNextGenSwich5:
+add dx, 2
+call checkPixel         ;\\\
+cmp al, SQUARECOLOR     ;\X\
+jne storeNextGenSwich6  ;\\0
+inc bx
+storeNextGenSwich6:
+sub cx, 2
+call checkPixel         ;\\\
+cmp al, SQUARECOLOR     ;\X\
+jne storeNextGenSwich7  ;\0\
+inc bx
+storeNextGenSwich7:
+sub cx, 2
+call checkPixel         ;\\\
+cmp al, SQUARECOLOR     ;\X\
+jne storeNextGenSwich8  ;0\\
+inc bx
+storeNextGenSwich8:
+add cx, 2
+sub dx, 2
+
+call checkPixel
+cmp al, SQUARECOLOR
+jne storeNextGenEnd2        ; if dead just check if it can be born
+
+cmp bx, 1
+jbe storeNextGenSwich9
+mov [si], 0
+jmp storeNextGenEnd3  ; if 1 or 0 => kill
+storeNextGenSwich9:
+
+cmp bx, 3
+jbe storeNextGenSwich10
+mov [si], 0
+jmp storeNextGenEnd3  ; if 2 or 3 => survive
+storeNextGenSwich10:
+
+
+mov [si], 0             ; more than 3 => kill
+jmp storeNextGenEnd3
+
+storeNextGenEnd2:
+cmp bx, 3                   ; if 3 => born
+jne storeNextGenEnd3
+mov [si], 1
+
+
+storeNextGenEnd3:
+
+inc si
+cmp cx, MAXCOLLUM           ; check if end of screen
+jbe storeNextGenLoop1
+cmp dx, MAXLINE
+jbe storeNextGenLoop1
+
+ret
+storeNextGen endp
+
+;*****************************************************************
+; saveGen - Save Gen
+; description: saves current gen
+; input - none
+; output - current gen in var nextGen
+; destroy - si, bx, cx, dx
+;*****************************************************************
+saveGen proc
+lea si, nextGen
+xor cx, cx
+mov dx, 10
+saveGenLoop1:
+call checkPixel
+mov [si], 1
+cmp al, SQUARECOLOR
+je saveGenEnd1
+mov [si], 0
+saveGenEnd1:
+add cx, 2
+inc si
+cmp cx, MAXCOLLUM
+jbe saveGenLoop1
+xor cx, cx
+add dx, 2
+cmp dx, MAXLINE
+jbe saveGenLoop1
+ret
+saveGen endp
+
+;*****************************************************************
+; getCharFromBuffer - get character form keyboard buffer
+; description: rotine that gets a char from the keyboard buffer
+; input - nothing
+; output - ZF set to 0 if there is a char and retorns it in al
+; destroi - ax
+;*****************************************************************
+getCharFromBuffer proc
+push dx
+
+mov ah, 6
+mov dl, 255
+int 21h
+
+pop dx
+ret
+getCharFromBuffer endp
+
+;*****************************************************************
+; clickGrid - Click Grid
+; description:
+; input - none
+; output - none
+; destroy - nothing
+;*****************************************************************
+clickGrid proc
+clickGridLoop1:
+call getCharFromBuffer
+jz clickGridEnd2
+cmp al, 0DH ; check if enter was pressed
+jne clickGridEnd2
+call storeNextGen
+clickGridEnd2:
+
+call getMousePos
+cmp dx, 10 ; only do something above line 9
+jb clickGridLoop1
+
+cmp bx, 01 ; on left click
+jne clickGridLoop1
+
+shr cx, 2
+shl cx, 1
+
+shr dx, 1
+shl dx, 1
+
+mov bh, SQUARECOLOR
+call checkPixel
+cmp al, SQUARECOLOR
+jne clickGridEnd1
+mov bh, 0           ; if already 'SQUARECOLOR' paint black
+clickGridEnd1:
+mov al, bh
+call drawFilledSquare
+jmp clickGridLoop1
+
+ret
+clickGrid endp
+
+;*****************************************************************
+; initMouse - Initiate Mouse
+; description: starts the mouse
+; input - none
+; output - none
+; destroy - nothing
+;*****************************************************************
+initMouse proc
+xor ax, ax
+int 33h
+ret
+initMouse endp
+
+;*****************************************************************
+; getMousePos - get Mouse Position
+; description:
+; input - none
+; output - BX = Button pressed (1 - botao da esquerda, 2 - botao da direita e  3 ambos os botoes)
+;            CX = horizontal position (column)
+;            DX = Vertical position (row)
+; destroy - nothing
+;*****************************************************************
+getMousePos proc
+push ax
+mov ax,03h
+int 33h
+pop ax
+ret
+getMousePos endp
+
+;*****************************************************************
+; initGraph - Initiate Graph
+; description: starts the graph interface
+; input - none
+; output - Graph interface on the screen
+; destroy - nothing
+;*****************************************************************
+initGraph proc
+xor ah, ah
+mov al, 13h
+int 10h
+ret
+initGraph endp
+
+clearGraph proc
+push ax
+mov ah,06
+mov al,00
+mov BH,00 ; attributes to be used on blanked lines
+mov cx,0 ; CH,CL = row,column of upper left corner of window to scroll
+mov DH,25 ;= row,column of lower right corner of window
+mov DL,40
+int 10h
+pop ax
+ret
+clearGraph endp
+
 ;*****************************************************************
 ; drawSquareAuto - draws a square
-; descricao: 
-; input - xI = x coord of start
-;         yI = y coord of start
-;         xF = x coord of end
-;         yF = y coord of end 
-;         al = color [0, 255]
+; descricao:
+; input - cx = x start position
+;         dx = y start position
 ; output - square on the screen
-; destroi - nada
+; destroi - nothing
 ;*****************************************************************
 drawFilledSquare proc
-    mov al, SQUARECOLOR
-    mov cx, xI
-    mov dx, yI
-    
-    drawFilledSquareLoop2:
-    drawFilledSquareLoop1:
-    call drawPixel
-    inc cx
-    cmp cx, xF 
-    jne drawFilledSquareLoop1 
-    mov cx, xI
-    inc dx
-    cmp dx, yF
-    jne drawFilledSquareLoop2 
-    ret       
+push bp
+mov bp, sp
+sub sp, 4
+mov [bp - 2], cx ; x final position
+mov [bp - 4], dx ; y final position
+inc [bp - 2]
+inc [bp - 4]
+
+drawFilledSquareLoop1:
+call drawPixel
+inc cx
+cmp cx, [bp - 2]
+jbe drawFilledSquareLoop1
+sub cx, 2
+inc dx
+cmp dx, [bp - 4]
+jbe drawFilledSquareLoop1
+
+add sp, 4
+pop bp
+ret
 drawFilledSquare endp
 
 ;*****************************************************************
+; drawPixel - draws a pixel
+; descricao:
+; input - AL = pixel color
+;         CX = column
+;         DX = row
+; output - pixel on the screen
+; destroi - ah
+;*****************************************************************
+drawPixel proc
+mov ah, 0Ch
+int 10h
+ret
+drawPixel endp
+
+;*****************************************************************
+; setCursorSizePosition - Cursor size and position
+; descricao: rotine that gets the size and position of cursor
+; input - Active page, linha, coluna
+;         dh - linha
+;         dl - coluna
+;         bh - pagina ativa
+; output - nada
+; destroi - cx e dx
+;*****************************************************************
+setCursorPosition proc
+push ax
+
+mov ah, 02h
+int 10h
+
+pop ax
+ret
+setCursorPosition endp
+
+;*****************************************************************
 ; drawLine - draws a line
-; description: draws a line does put 'cursor' in next line 
+; description: draws a line does put 'cursor' in next line
 ; input - none
 ; output - line on the screen
 ; destroy - nada
 ;*****************************************************************
 drawLine proc
-    mov al, GRIDCOLOR
-    drawLineLoop1:
-    call drawPixel ; draws the line
-    inc cx
-    cmp cx, 320 
-    jne drawLineLoop1
-    xor cx, cx
-    inc dx
-    ret
+mov al, GRIDCOLOR
+drawLineLoop1:
+call drawPixel ; draws the line
+inc cx
+cmp cx, MAXCOLLUM
+jne drawLineLoop1
+xor cx, cx
+ret
 drawLine endp
-
-;*****************************************************************
-; drawColum - draws the collum
-; description: draws collum does put 'cursor' on the next line
-; input - none
-; output - collum on the screen
-; destroy - nada
-;*****************************************************************
-drawCollum proc
-    
-    drawCollumLoop2:
-    drawCollumLoop1:
-    mov al, GRIDCOLOR
-    call drawPixel ; draws the line
-    add cx, 10
-    cmp cx, 320 
-    jb drawCollumLoop1
-    xor cx, cx ;put on the start of the next line
-    inc dx
-    mov ax, dx
-    mov bl, 10
-    div bl
-    cmp ah, 0
-    jne drawCollumLoop2 
-     
-    ret
-drawCollum endp
 
 ;*****************************************************************
 ; paint2PixelsX - draws two pixels of a squar on screen
