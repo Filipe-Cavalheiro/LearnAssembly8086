@@ -40,10 +40,6 @@ data segment
     strTemp db 10 dup(0)
     genNum dw 122
     cellNum dw 156
-    xI dw 1
-    yI dw 1
-    xF dw 1
-    yF dw 1
 ends
 
 stack segment
