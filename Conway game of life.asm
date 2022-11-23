@@ -78,6 +78,84 @@ ret
 checkPixel endp
 
 ;*****************************************************************
+; clickGrid - Click Grid
+; description:
+; input - none
+; output - none
+; destroy - nothing
+;*****************************************************************
+clickGrid proc
+    clickGridLoop1:
+    call getCharFromBuffer
+    jz clickGridEnd2
+    cmp al, 0DH ; check if enter was pressed
+    jne clickGridEnd2
+    call storeNextGen 
+    call drawNextGen
+    clickGridEnd2:
+    
+    call getMousePos
+    cmp bx, 02 ; on right click
+    je clickGridEnd3
+    
+    cmp dx, 10 ; only do something above line 9
+    jb clickGridLoop1
+    
+    cmp bx, 01 ; on left click
+    jne clickGridLoop1
+    
+    shr cx, 2
+    shl cx, 1
+    
+    shr dx, 1
+    shl dx, 1
+    
+    mov bh, SQUARECOLOR
+    call checkPixel
+    cmp al, SQUARECOLOR
+    jne clickGridEnd1
+    mov bh, 0           ; if already 'SQUARECOLOR' paint black
+    clickGridEnd1:
+    mov al, bh
+    call drawFilledSquare
+    jmp clickGridLoop1
+    clickGridEnd3:
+    
+    ret
+clickGrid endp
+
+;*****************************************************************
+; drawNextGen - Draw Next Gen
+; description: draws the pixel accordingly with var nextGen
+; input - none
+; output - none
+; destroy - nothing
+;*****************************************************************
+drawNextGen proc
+    mov dx, 10
+    xor cx, cx
+    lea si, nextGen
+    
+    drawNextGenLoop1:
+    mov al, SQUARECOLOR
+    cmp [si], 1
+    je drawNextGenEnd1
+    mov al, 0       
+    drawNextGenEnd1:
+    call drawFilledSquare
+    inc si
+    add cx, 2
+    cmp cx, MAXCOLLUM
+    jbe drawNextGenLoop1
+    xor cx, cx
+    add dx, 2 
+    cmp dx, MAXLINE
+    jbe drawNextGenLoop1
+
+    ret
+drawNextGen endp
+
+;*****************************************************************
 ; storeNextGen - store Next Gen
 ; description: stores next gen in nextGen
 ; input - none
@@ -85,100 +163,100 @@ checkPixel endp
 ; destroy - ax, bx, cx, dx, si
 ;*****************************************************************
 storeNextGen proc
-lea si, nextGen
-xor cx, cx
-mov dx, 10
+	lea si, nextGen
+	xor cx, cx
+	mov dx, 10
 
-storeNextGenLoop1:
-xor bx,bx
+	storeNextGenLoop1:
+	xor bx,bx
 
-storeNextGenEnd1:
-sub cx, 2
-call checkPixel         ;\\\
-cmp al, SQUARECOLOR     ;0X\
-jne storeNextGenSwich1  ;\\\
-inc bx
-storeNextGenSwich1:
-sub dx, 2
-call checkPixel         ;0\\
-cmp al, SQUARECOLOR     ;\X\
-jne storeNextGenSwich2  ;\\\
-inc bx
-storeNextGenSwich2:
-add cx, 2
-call checkPixel         ;\0\
-cmp al, SQUARECOLOR     ;\X\
-jne storeNextGenSwich3  ;\\\
-inc ax
-storeNextGenSwich3:
-add cx, 2
-call checkPixel         ;\\0
-cmp al, SQUARECOLOR     ;\X\
-jne storeNextGenSwich4  ;\\\
-inc bx
-storeNextGenSwich4:
-add dx, 2
-call checkPixel         ;\\\
-cmp al, SQUARECOLOR     ;\X0
-jne storeNextGenSwich5  ;\\\
-inc bx
-storeNextGenSwich5:
-add dx, 2
-call checkPixel         ;\\\
-cmp al, SQUARECOLOR     ;\X\
-jne storeNextGenSwich6  ;\\0
-inc bx
-storeNextGenSwich6:
-sub cx, 2
-call checkPixel         ;\\\
-cmp al, SQUARECOLOR     ;\X\
-jne storeNextGenSwich7  ;\0\
-inc bx
-storeNextGenSwich7:
-sub cx, 2
-call checkPixel         ;\\\
-cmp al, SQUARECOLOR     ;\X\
-jne storeNextGenSwich8  ;0\\
-inc bx
-storeNextGenSwich8:
-add cx, 2
-sub dx, 2
+	storeNextGenEnd1:
+	sub cx, 2
+	call checkPixel         ;\\\
+	cmp al, SQUARECOLOR     ;0X\
+	jne storeNextGenSwich1  ;\\\
+	inc bx
+	storeNextGenSwich1:
+	sub dx, 2
+	call checkPixel         ;0\\
+	cmp al, SQUARECOLOR     ;\X\
+	jne storeNextGenSwich2  ;\\\
+	inc bx
+	storeNextGenSwich2:
+	add cx, 2
+	call checkPixel         ;\0\
+	cmp al, SQUARECOLOR     ;\X\
+	jne storeNextGenSwich3  ;\\\
+	inc ax
+	storeNextGenSwich3:
+	add cx, 2
+	call checkPixel         ;\\0
+	cmp al, SQUARECOLOR     ;\X\
+	jne storeNextGenSwich4  ;\\\
+	inc bx
+	storeNextGenSwich4:
+	add dx, 2
+	call checkPixel         ;\\\
+	cmp al, SQUARECOLOR     ;\X0
+	jne storeNextGenSwich5  ;\\\
+	inc bx
+	storeNextGenSwich5:
+	add dx, 2
+	call checkPixel         ;\\\
+	cmp al, SQUARECOLOR     ;\X\
+	jne storeNextGenSwich6  ;\\0
+	inc bx
+	storeNextGenSwich6:
+	sub cx, 2
+	call checkPixel         ;\\\
+	cmp al, SQUARECOLOR     ;\X\
+	jne storeNextGenSwich7  ;\0\
+	inc bx
+	storeNextGenSwich7:
+	sub cx, 2
+	call checkPixel         ;\\\
+	cmp al, SQUARECOLOR     ;\X\
+	jne storeNextGenSwich8  ;0\\
+	inc bx
+	storeNextGenSwich8:
+	add cx, 2
+	sub dx, 2
 
-call checkPixel
-cmp al, SQUARECOLOR
-jne storeNextGenEnd2        ; if dead just check if it can be born
+	call checkPixel
+	cmp al, SQUARECOLOR
+	jne storeNextGenEnd2        ; if dead just check if it can be born
 
-cmp bx, 1
-jbe storeNextGenSwich9
-mov [si], 0
-jmp storeNextGenEnd3  ; if 1 or 0 => kill
-storeNextGenSwich9:
+	cmp bx, 1
+	jbe storeNextGenSwich9
+	mov [si], 0
+	jmp storeNextGenEnd3  ; if 1 or 0 => kill
+	storeNextGenSwich9:
 
-cmp bx, 3
-jbe storeNextGenSwich10
-mov [si], 0
-jmp storeNextGenEnd3  ; if 2 or 3 => survive
-storeNextGenSwich10:
-
-
-mov [si], 0             ; more than 3 => kill
-jmp storeNextGenEnd3
-
-storeNextGenEnd2:
-cmp bx, 3                   ; if 3 => born
-jne storeNextGenEnd3
-mov [si], 1
+	cmp bx, 3
+	jbe storeNextGenSwich10
+	mov [si], 0
+	jmp storeNextGenEnd3  ; if 2 or 3 => survive
+	storeNextGenSwich10:
 
 
-storeNextGenEnd3:
+	mov [si], 0             ; more than 3 => kill
+	jmp storeNextGenEnd3
 
-inc si
-cmp cx, MAXCOLLUM           ; check if end of screen
-jbe storeNextGenLoop1
-cmp dx, MAXLINE
-jbe storeNextGenLoop1
+	storeNextGenEnd2:
+	cmp bx, 3                   ; if 3 => born
+	jne storeNextGenEnd3
+	mov [si], 1
 
-ret
+
+	storeNextGenEnd3:
+
+	inc si
+	cmp cx, MAXCOLLUM           ; check if end of screen
+	jbe storeNextGenLoop1
+	cmp dx, MAXLINE
+	jbe storeNextGenLoop1
+
+	ret
 storeNextGen endp
 
 ;*****************************************************************
@@ -189,25 +267,25 @@ storeNextGen endp
 ; destroy - si, bx, cx, dx
 ;*****************************************************************
 saveGen proc
-lea si, nextGen
-xor cx, cx
-mov dx, 10
-saveGenLoop1:
-call checkPixel
-mov [si], 1
-cmp al, SQUARECOLOR
-je saveGenEnd1
-mov [si], 0
-saveGenEnd1:
-add cx, 2
-inc si
-cmp cx, MAXCOLLUM
-jbe saveGenLoop1
-xor cx, cx
-add dx, 2
-cmp dx, MAXLINE
-jbe saveGenLoop1
-ret
+	lea si, nextGen
+	xor cx, cx
+	mov dx, 10
+	saveGenLoop1:
+	call checkPixel
+	mov [si], 1
+	cmp al, SQUARECOLOR
+	je saveGenEnd1
+	mov [si], 0
+	saveGenEnd1:
+	add cx, 2
+	inc si
+	cmp cx, MAXCOLLUM
+	jbe saveGenLoop1
+	xor cx, cx
+	add dx, 2
+	cmp dx, MAXLINE
+	jbe saveGenLoop1
+	ret
 saveGen endp
 
 ;*****************************************************************
@@ -619,48 +697,6 @@ returnOs proc
 returnOs endp
 
 ;*****************************************************************
-; clickGrid - Click Grid
-; description:
-; input - none
-; output - none
-; destroy - nothing
-;*****************************************************************
-clickGrid proc
-clickGridLoop1:
-call getCharFromBuffer
-jz clickGridEnd2
-cmp al, 0DH ; check if enter was pressed
-jne clickGridEnd2
-call storeNextGen
-clickGridEnd2:
-
-call getMousePos
-cmp dx, 10 ; only do something above line 9
-jb clickGridLoop1
-
-cmp bx, 01 ; on left click
-jne clickGridLoop1
-
-shr cx, 2
-shl cx, 1
-
-shr dx, 1
-shl dx, 1
-
-mov bh, SQUARECOLOR
-call checkPixel
-cmp al, SQUARECOLOR
-jne clickGridEnd1
-mov bh, 0           ; if already 'SQUARECOLOR' paint black
-clickGridEnd1:
-mov al, bh
-call drawFilledSquare
-jmp clickGridLoop1
-
-ret
-clickGrid endp
-
-;*****************************************************************
 ; initMouse - Initiate Mouse
 ; description: starts the mouse
 ; input - none
@@ -668,9 +704,9 @@ clickGrid endp
 ; destroy - nothing
 ;*****************************************************************
 initMouse proc
-xor ax, ax
-int 33h
-ret
+	xor ax, ax
+	int 33h
+	ret
 initMouse endp
 
 ;*****************************************************************
@@ -683,11 +719,11 @@ initMouse endp
 ; destroy - nothing
 ;*****************************************************************
 getMousePos proc
-push ax
-mov ax,03h
-int 33h
-pop ax
-ret
+	push ax
+	mov ax,03h
+	int 33h
+	pop ax
+	ret
 getMousePos endp
 
 ;*****************************************************************
@@ -698,23 +734,23 @@ getMousePos endp
 ; destroy - nothing
 ;*****************************************************************
 initGraph proc
-xor ah, ah
-mov al, 13h
-int 10h
-ret
+	xor ah, ah
+	mov al, 13h
+	int 10h
+	ret
 initGraph endp
 
 clearGraph proc
-push ax
-mov ah,06
-mov al,00
-mov BH,00 ; attributes to be used on blanked lines
-mov cx,0 ; CH,CL = row,column of upper left corner of window to scroll
-mov DH,25 ;= row,column of lower right corner of window
-mov DL,40
-int 10h
-pop ax
-ret
+	push ax
+	mov ah,06
+	mov al,00
+	mov BH,00 ; attributes to be used on blanked lines
+	mov cx,0 ; CH,CL = row,column of upper left corner of window to scroll
+	mov DH,25 ;= row,column of lower right corner of window
+	mov DL,40
+	int 10h
+	pop ax
+	ret
 clearGraph endp
 
 ;*****************************************************************
@@ -726,27 +762,27 @@ clearGraph endp
 ; destroi - nothing
 ;*****************************************************************
 drawFilledSquare proc
-push bp
-mov bp, sp
-sub sp, 4
-mov [bp - 2], cx ; x final position
-mov [bp - 4], dx ; y final position
-inc [bp - 2]
-inc [bp - 4]
+	push bp
+	mov bp, sp
+	sub sp, 4
+	mov [bp - 2], cx ; x final position
+	mov [bp - 4], dx ; y final position
+	inc [bp - 2]
+	inc [bp - 4]
 
-drawFilledSquareLoop1:
-call drawPixel
-inc cx
-cmp cx, [bp - 2]
-jbe drawFilledSquareLoop1
-sub cx, 2
-inc dx
-cmp dx, [bp - 4]
-jbe drawFilledSquareLoop1
+	drawFilledSquareLoop1:
+	call drawPixel
+	inc cx
+	cmp cx, [bp - 2]
+	jbe drawFilledSquareLoop1
+	sub cx, 2
+	inc dx
+	cmp dx, [bp - 4]
+	jbe drawFilledSquareLoop1
 
-add sp, 4
-pop bp
-ret
+	add sp, 4
+	pop bp
+	ret
 drawFilledSquare endp
 
 ;*****************************************************************
@@ -759,9 +795,9 @@ drawFilledSquare endp
 ; destroi - ah
 ;*****************************************************************
 drawPixel proc
-mov ah, 0Ch
-int 10h
-ret
+	mov ah, 0Ch
+	int 10h
+	ret
 drawPixel endp
 
 ;*****************************************************************
@@ -775,13 +811,11 @@ drawPixel endp
 ; destroi - cx e dx
 ;*****************************************************************
 setCursorPosition proc
-push ax
-
-mov ah, 02h
-int 10h
-
-pop ax
-ret
+	push ax
+	mov ah, 02h
+	int 10h
+	pop ax
+	ret
 setCursorPosition endp
 
 ;*****************************************************************
@@ -792,14 +826,14 @@ setCursorPosition endp
 ; destroy - nada
 ;*****************************************************************
 drawLine proc
-mov al, GRIDCOLOR
-drawLineLoop1:
-call drawPixel ; draws the line
-inc cx
-cmp cx, MAXCOLLUM
-jne drawLineLoop1
-xor cx, cx
-ret
+	mov al, GRIDCOLOR
+	drawLineLoop1:
+	call drawPixel ; draws the line
+	inc cx
+	cmp cx, MAXCOLLUM
+	jne drawLineLoop1
+	xor cx, cx
+	ret
 drawLine endp
 
 ;*****************************************************************
