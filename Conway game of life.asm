@@ -1198,90 +1198,46 @@ ErrorHandler proc
 ErrorHandler endp
 
 ;*****************************************************************
-; printfNum - put number in a string
+; numToStr - put number in a string
 ; descricao: routine that converts a number to a string
 ; input - SI = start of string
 ;         AX = number to be printed
 ; output - nenhum
 ; destroi - cx, dx, ax
 ;*****************************************************************
-strToInt proc
-        push bx
-        
-        xor cx, cx
-        mov bx, 10
-        
-        strToIntLoop1:
-            
-            inc cx
-            xor dx, dx
-            
-            div bx
-            add dx, 30h
-            push dx
-            
-            or ax, ax
-            jz strToIntEndLoop1
-        
-            jmp strToIntLoop1
-        strToIntEndLoop1:
-        
-        
-        strToIntLoop2:
-            
-            pop dx
-            mov [si], dl
-            inc si
-            
-        loop strToIntLoop2
-        
-        pop bx
-        ret
-strToInt endp
-
-;*****************************************************************
-; printfNum - put number in string
-; descricao:
-; input - SI= start of string
-;         AX = number to be printed
-; output - nenhum
-; destroi - nada
-;*****************************************************************
-printfNum proc
+numToStr proc
     push bx
-    push si
-    mov cx, 0
     
-    L1PrintfNum:
-    mov bl, 10
-    div bl
-    inc cx
-    mov dl, al
-    mov al, 00H
-    add ah, '0'
-    push ax
-    mov al, dl
-    mov ah, 00H
-    cmp al, 0
-    je endL1PrintfNum
-    jmp L1PrintfNum
+    xor cx, cx
+    mov bx, 10
     
-    endL1PrintfNum:
-    L2PrintfNum:
-    dec cx
-    pop ax
-    mov [si], ah
-    INC SI
-    cmp cx, 0
-    je endL2PrintfNum
-    jmp L2PrintfNum
-    endL2PrintfNum:
+    numToStrLoop1:
+        
+        inc cx
+        xor dx, dx
+        
+        div bx
+        add dx, 30h
+        push dx
+        
+        or ax, ax
+        jz numToStrEndLoop1
     
-    mov [SI], 00H
-    pop si
+        jmp numToStrLoop1
+    numToStrEndLoop1:
+    
+    
+    numToStrLoop2:
+        
+        pop dx
+        mov [si], dl
+        inc si
+        
+    loop numToStrLoop2
+    
     pop bx
-   ret
-printfNum endp
+    ret
+numToStr endp
 
 ;*****************************************************************
 ; constructButtonCenterX - Buttons on the center of the x position
