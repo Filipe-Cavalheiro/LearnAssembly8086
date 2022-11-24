@@ -1240,6 +1240,61 @@ numToStr proc
 numToStr endp
 
 ;*****************************************************************
+; shiftStrRight - shift string to the right
+; descricao: routine that shifts every character in the string on byte to the right
+; input - si, start of the string
+;         cx, length of the string
+; output - nenhum
+; destroi - cx, dl 
+;*****************************************************************       
+shiftStrRight proc
+    
+    add si, cx
+    
+    shiftStrRightLoop:
+    
+        mov dl, [si - 1]
+        mov [si], dl
+        dec si    
+    
+    loop shiftStrRightLoop
+     
+    ret
+shiftStrRight endp
+
+;*****************************************************************
+; assertStrLen - Assert string length
+; descricao: routine that checks if the string has the desired length, if not adds zeros to the beggining of it until it does
+; input - si, start of the string 
+;         cx, lenght of string
+;         bx, desired length of the string 
+; output - nenhum
+; destroi - si, cx 
+;*****************************************************************
+assertStrLen proc
+    push si
+    
+    cmp cx, bx
+    jnb skipAssert
+        xchg cx, bx
+        sub cx, bx
+        
+        AssertionLoop:
+            push cx
+            mov cx, bx
+            call shiftStrRight
+            pop cx
+            mov [si], '0'
+            inc si
+            
+        loop AssertionLoop
+    skipAssert:
+    
+    pop si
+    ret
+assertStrLen endp
+
+;*****************************************************************
 ; constructButtonCenterX - Buttons on the center of the x position
 ; descricao: creates a button on the center of the screen in the x position
 ; input - center of the button on the y position and color
