@@ -1,11 +1,11 @@
 data segment
-    MAXSTRSIZE equ 100
+    MAXPLAYERNAME equ 11
+    MAXBUFFERSIZE equ 41*4      
     GRIDCOLOR equ 27
-	SQUARECOLOR equ 15
-	MAXCOLLUM equ 320
-	MAXLINE equ 200
-    handler dw 0
+    SQUARECOLOR equ 15
     logFile db "C:\ConwayGame\Log.txt", 0
+    TopFile db "C:\ConwayGame\Top5.txt", 0
+    FilesPath db "C:\ConwayGame\", 0
     strOpenError db "Error on open: $"
     strCreateError db "Error on create: $"
     strCloseError db "Error on close: $"
@@ -32,14 +32,19 @@ data segment
     strTop5 db "Top  5$"
     strCredits db "*Credits$"
     strExit db "Exit$"
+    strTop5Screen db "Gen Cells   Player   Date    Time$"
     strGetPlayerName db "Enter username: $"
     strDiogo db "Diogo Matos Novais  n", 0A7h, " 62506$"
     strFilipe db "Filipe Silva Cavalheiro n", 0A7h, " 62894$"
-    strLog db 8 dup(0), ":", 6 dup(0), ":", MAXSTRSIZE dup(0), 15 dup(0) 
-    strPlayerName db MAXSTRSIZE dup(0)
-    strTemp db 10 dup(0)
-    genNum dw 122
-    cellNum dw 156
+    strLog db 28 dup(0), MAXPLAYERNAME dup(0), 0DH, 0AH, 0 
+    strPlayerName db MAXPLAYERNAME dup(0)
+    strTemp db MAXBUFFERSIZE dup(0)
+    genNum dw 128
+    cellNum dw 158
+    xI dw 1
+    yI dw 1
+    xF dw 1
+    yF dw 1
 ends
 
 stack segment
@@ -50,243 +55,21 @@ code segment
 start:
     mov ax, data
     mov ds, ax
-    mov es, ax    
+    mov es, ax         
     
     call initGraph
+    call initMouse
     
     loop1:
+        call showMouseCursor
         call startMenu
-        call initGraph
+        call clearGraph
     jmp loop1
     
     mov ax,4c00h ; terminate program
     int 21h
 ends
 
-;*****************************************************************
-; checkPixel - Check Pixel
-; description: checks if pixel is 'dead' or 'alive'
-; input - CX = x coord
-;         DX = y coord
-; output - color in AL
-; destroy - al
-;*****************************************************************
-checkPixel proc
-mov ah, 0Dh
-int 10h
-ret
-checkPixel endp
-
-;*****************************************************************
-; clickGrid - Click Grid
-; description:
-; input - none
-; output - none
-; destroy - nothing
-;*****************************************************************
-clickGrid proc
-    clickGridLoop1:
-    call getCharFromBuffer
-    jz clickGridEnd2
-    cmp al, 0DH ; check if enter was pressed
-    jne clickGridEnd2
-    call storeNextGen 
-    call drawNextGen
-    clickGridEnd2:
-    
-    call getMousePos
-    cmp bx, 02 ; on right click
-    je clickGridEnd3
-    
-    cmp dx, 10 ; only do something above line 9
-    jb clickGridLoop1
-    
-    cmp bx, 01 ; on left click
-    jne clickGridLoop1
-    
-    shr cx, 2
-    shl cx, 1
-    
-    shr dx, 1
-    shl dx, 1
-    
-    mov bh, SQUARECOLOR
-    call checkPixel
-    cmp al, SQUARECOLOR
-    jne clickGridEnd1
-    mov bh, 0           ; if already 'SQUARECOLOR' paint black
-    clickGridEnd1:
-    mov al, bh
-    call drawFilledSquare
-    jmp clickGridLoop1
-    clickGridEnd3:
-    
-    ret
-clickGrid endp
-
-;*****************************************************************
-; drawNextGen - Draw Next Gen
-; description: draws the pixel accordingly with var nextGen
-; input - none
-; output - none
-; destroy - nothing
-;*****************************************************************
-drawNextGen proc
-    mov dx, 10
-    xor cx, cx
-    lea si, nextGen
-    
-    drawNextGenLoop1:
-    mov al, SQUARECOLOR
-    cmp [si], 1
-    je drawNextGenEnd1
-    mov al, 0       
-    drawNextGenEnd1:
-    call drawFilledSquare
-    inc si
-    add cx, 2
-    cmp cx, MAXCOLLUM
-    jbe drawNextGenLoop1
-    xor cx, cx
-    add dx, 2 
-    cmp dx, MAXLINE
-    jbe drawNextGenLoop1
-
-    ret
-drawNextGen endp
-
-;*****************************************************************
-; storeNextGen - store Next Gen
-; description: stores next gen in nextGen
-; input - none
-; output - next gen in var nextGen
-; destroy - ax, bx, cx, dx, si
-;*****************************************************************
-storeNextGen proc
-	lea si, nextGen
-	xor cx, cx
-	mov dx, 10
-
-	storeNextGenLoop1:
-	xor bx,bx
-
-	storeNextGenEnd1:
-	sub cx, 2
-	call checkPixel         ;\\\
-	cmp al, SQUARECOLOR     ;0X\
-	jne storeNextGenSwich1  ;\\\
-	inc bx
-	storeNextGenSwich1:
-	sub dx, 2
-	call checkPixel         ;0\\
-	cmp al, SQUARECOLOR     ;\X\
-	jne storeNextGenSwich2  ;\\\
-	inc bx
-	storeNextGenSwich2:
-	add cx, 2
-	call checkPixel         ;\0\
-	cmp al, SQUARECOLOR     ;\X\
-	jne storeNextGenSwich3  ;\\\
-	inc ax
-	storeNextGenSwich3:
-	add cx, 2
-	call checkPixel         ;\\0
-	cmp al, SQUARECOLOR     ;\X\
-	jne storeNextGenSwich4  ;\\\
-	inc bx
-	storeNextGenSwich4:
-	add dx, 2
-	call checkPixel         ;\\\
-	cmp al, SQUARECOLOR     ;\X0
-	jne storeNextGenSwich5  ;\\\
-	inc bx
-	storeNextGenSwich5:
-	add dx, 2
-	call checkPixel         ;\\\
-	cmp al, SQUARECOLOR     ;\X\
-	jne storeNextGenSwich6  ;\\0
-	inc bx
-	storeNextGenSwich6:
-	sub cx, 2
-	call checkPixel         ;\\\
-	cmp al, SQUARECOLOR     ;\X\
-	jne storeNextGenSwich7  ;\0\
-	inc bx
-	storeNextGenSwich7:
-	sub cx, 2
-	call checkPixel         ;\\\
-	cmp al, SQUARECOLOR     ;\X\
-	jne storeNextGenSwich8  ;0\\
-	inc bx
-	storeNextGenSwich8:
-	add cx, 2
-	sub dx, 2
-
-	call checkPixel
-	cmp al, SQUARECOLOR
-	jne storeNextGenEnd2        ; if dead just check if it can be born
-
-	cmp bx, 1
-	jbe storeNextGenSwich9
-	mov [si], 0
-	jmp storeNextGenEnd3  ; if 1 or 0 => kill
-	storeNextGenSwich9:
-
-	cmp bx, 3
-	jbe storeNextGenSwich10
-	mov [si], 0
-	jmp storeNextGenEnd3  ; if 2 or 3 => survive
-	storeNextGenSwich10:
-
-
-	mov [si], 0             ; more than 3 => kill
-	jmp storeNextGenEnd3
-
-	storeNextGenEnd2:
-	cmp bx, 3                   ; if 3 => born
-	jne storeNextGenEnd3
-	mov [si], 1
-
-
-	storeNextGenEnd3:
-
-	inc si
-	cmp cx, MAXCOLLUM           ; check if end of screen
-	jbe storeNextGenLoop1
-	cmp dx, MAXLINE
-	jbe storeNextGenLoop1
-
-	ret
-storeNextGen endp
-
-;*****************************************************************
-; saveGen - Save Gen
-; description: saves current gen
-; input - none
-; output - current gen in var nextGen
-; destroy - si, bx, cx, dx
-;*****************************************************************
-saveGen proc
-	lea si, nextGen
-	xor cx, cx
-	mov dx, 10
-	saveGenLoop1:
-	call checkPixel
-	mov [si], 1
-	cmp al, SQUARECOLOR
-	je saveGenEnd1
-	mov [si], 0
-	saveGenEnd1:
-	add cx, 2
-	inc si
-	cmp cx, MAXCOLLUM
-	jbe saveGenLoop1
-	xor cx, cx
-	add dx, 2
-	cmp dx, MAXLINE
-	jbe saveGenLoop1
-	ret
-saveGen endp
 
 ;*****************************************************************
 ; initGraph - Initiate Graph
@@ -384,13 +167,39 @@ getCursorSizePosition endp
 ; description: starts the mouse 
 ; input - none
 ; output - none
-; destroy - nothing
+; destroy - ax
 ;*****************************************************************
 initMouse proc
     xor ax, ax
     int 33h 
     ret
 initMouse endp
+
+;*****************************************************************
+; showMouseCursor - show mouse cursor
+; description: shows the mouse cursor on screen 
+; input - none
+; output - none
+; destroy - ax
+;*****************************************************************
+showMouseCursor proc
+    mov ax, 01
+    int 33h 
+    ret
+showMouseCursor endp
+
+;*****************************************************************
+; hideMouseCursor - show mouse cursor
+; description: shows the mouse cursor on screen 
+; input - none
+; output - none
+; destroy - ax
+;*****************************************************************
+hideMouseCursor proc
+    mov ax, 01
+    int 33h 
+    ret
+hideMouseCursor endp
 
 ;*****************************************************************
 ; getMousePos - get Mouse Position
@@ -426,23 +235,6 @@ ci proc
 ci endp
 
 ;*****************************************************************
-; getChar - get Char
-; descricao: wait for user input of a char
-; input - DI = deslocamento da string a escrever desde o inicio do segmento de dados
-; output - char
-; destroi - nada
-;*****************************************************************
-getChar proc
-    push ax
-    mov ah, 01H
-    INT 21H
-    mov [DI], al
-    INC DI
-    pop ax
-    ret
-getChar endp
-
-;*****************************************************************
 ; getCharFromBuffer - get character form keyboard buffer
 ; descricao: rotine that gets a char from the keyboard buffer
 ; input - nada  
@@ -468,13 +260,9 @@ getCharFromBuffer endp
 ; destroi - nada
 ;*****************************************************************
 co proc
-    push ax
-    push dx
     mov ah,02H
     mov dl,al
     int 21H
-    pop dx
-    pop ax
     ret
 co endp
 
@@ -562,14 +350,31 @@ fcreate proc
 fcreate endp
 
 ;*****************************************************************
+; createDir - Create directory
+; description: routine that creates a directory 
+; input - dx - file location and name
+; output - none
+; destroy - bx, dx, ax
+;*****************************************************************
+createDir proc
+    
+    mov ah, 39h
+    int 21h
+   
+    ret
+createDir endp
+
+
+;*****************************************************************
 ; fopen - Open file
 ; description: routine that opens a file 
 ; input - al - open mode (0 - readOnly, 1 - writeOnly, 2 - readWrite, 3 - append(WriteOnly))
 ;         dx - file location and name
-; output - bx - file handler
+; output - bx - file handler or jc if error and ax, error code
 ; destroy - dx, cx, ax
 ;*****************************************************************
 fopen proc
+    
     mov cx, 1
     cmp al, 3
     jne NotAppend1
@@ -582,10 +387,9 @@ fopen proc
     int 21h
     
     jnc NoOpenError
-        lea dx, strOpenError 
-        call printf
-        call ErrorHandler
-        jmp EndFopen
+        
+        ret
+        
     NoOpenError:
     
     mov bx, ax
@@ -594,8 +398,8 @@ fopen proc
         mov al, 2
         xor dx, dx
         call fseek
-                       
-    EndFopen:       
+        
+    EndFopen:                          
     ret
 fopen endp
 
@@ -668,7 +472,7 @@ fwrite endp
 ; fclose - close file
 ; description: routine that closes file
 ; input - bx - file handler
-; output - bx - file handler
+; output - nada
 ; destroy - dx
 ;*****************************************************************    
 fclose proc
@@ -696,145 +500,82 @@ returnOs proc
     ret
 returnOs endp
 
-;*****************************************************************
-; initMouse - Initiate Mouse
-; description: starts the mouse
-; input - none
-; output - none
-; destroy - nothing
-;*****************************************************************
-initMouse proc
-	xor ax, ax
-	int 33h
-	ret
-initMouse endp
 
-;*****************************************************************
-; getMousePos - get Mouse Position
-; description:
-; input - none
-; output - BX = Button pressed (1 - botao da esquerda, 2 - botao da direita e  3 ambos os botoes)
-;            CX = horizontal position (column)
-;            DX = Vertical position (row)
-; destroy - nothing
-;*****************************************************************
-getMousePos proc
-	push ax
-	mov ax,03h
-	int 33h
-	pop ax
-	ret
-getMousePos endp
-
-;*****************************************************************
-; initGraph - Initiate Graph
-; description: starts the graph interface
-; input - none
-; output - Graph interface on the screen
-; destroy - nothing
-;*****************************************************************
-initGraph proc
-	xor ah, ah
-	mov al, 13h
-	int 10h
-	ret
-initGraph endp
-
-clearGraph proc
-	push ax
-	mov ah,06
-	mov al,00
-	mov BH,00 ; attributes to be used on blanked lines
-	mov cx,0 ; CH,CL = row,column of upper left corner of window to scroll
-	mov DH,25 ;= row,column of lower right corner of window
-	mov DL,40
-	int 10h
-	pop ax
-	ret
-clearGraph endp
-
+  
 ;*****************************************************************
 ; drawSquareAuto - draws a square
-; descricao:
-; input - cx = x start position
-;         dx = y start position
+; descricao: 
+; input - xI = x coord of start
+;         yI = y coord of start
+;         xF = x coord of end
+;         yF = y coord of end 
+;         al = color [0, 255]
 ; output - square on the screen
-; destroi - nothing
+; destroi - nada
 ;*****************************************************************
 drawFilledSquare proc
-	push bp
-	mov bp, sp
-	sub sp, 4
-	mov [bp - 2], cx ; x final position
-	mov [bp - 4], dx ; y final position
-	inc [bp - 2]
-	inc [bp - 4]
-
-	drawFilledSquareLoop1:
-	call drawPixel
-	inc cx
-	cmp cx, [bp - 2]
-	jbe drawFilledSquareLoop1
-	sub cx, 2
-	inc dx
-	cmp dx, [bp - 4]
-	jbe drawFilledSquareLoop1
-
-	add sp, 4
-	pop bp
-	ret
+    mov al, SQUARECOLOR
+    mov cx, xI
+    mov dx, yI
+    
+    drawFilledSquareLoop2:
+    drawFilledSquareLoop1:
+    call drawPixel
+    inc cx
+    cmp cx, xF 
+    jne drawFilledSquareLoop1 
+    mov cx, xI
+    inc dx
+    cmp dx, yF
+    jne drawFilledSquareLoop2 
+    ret       
 drawFilledSquare endp
 
 ;*****************************************************************
-; drawPixel - draws a pixel
-; descricao:
-; input - AL = pixel color
-;         CX = column
-;         DX = row
-; output - pixel on the screen
-; destroi - ah
-;*****************************************************************
-drawPixel proc
-	mov ah, 0Ch
-	int 10h
-	ret
-drawPixel endp
-
-;*****************************************************************
-; setCursorSizePosition - Cursor size and position
-; descricao: rotine that gets the size and position of cursor
-; input - Active page, linha, coluna
-;         dh - linha
-;         dl - coluna
-;         bh - pagina ativa
-; output - nada
-; destroi - cx e dx
-;*****************************************************************
-setCursorPosition proc
-	push ax
-	mov ah, 02h
-	int 10h
-	pop ax
-	ret
-setCursorPosition endp
-
-;*****************************************************************
 ; drawLine - draws a line
-; description: draws a line does put 'cursor' in next line
+; description: draws a line does put 'cursor' in next line 
 ; input - none
 ; output - line on the screen
 ; destroy - nada
 ;*****************************************************************
 drawLine proc
-	mov al, GRIDCOLOR
-	drawLineLoop1:
-	call drawPixel ; draws the line
-	inc cx
-	cmp cx, MAXCOLLUM
-	jne drawLineLoop1
-	xor cx, cx
-	ret
+    mov al, GRIDCOLOR
+    drawLineLoop1:
+    call drawPixel ; draws the line
+    inc cx
+    cmp cx, 320 
+    jne drawLineLoop1
+    xor cx, cx
+    inc dx
+    ret
 drawLine endp
+
+;*****************************************************************
+; drawColum - draws the collum
+; description: draws collum does put 'cursor' on the next line
+; input - none
+; output - collum on the screen
+; destroy - nada
+;*****************************************************************
+drawCollum proc
+    
+    drawCollumLoop2:
+    drawCollumLoop1:
+    mov al, GRIDCOLOR
+    call drawPixel ; draws the line
+    add cx, 10
+    cmp cx, 320 
+    jb drawCollumLoop1
+    xor cx, cx ;put on the start of the next line
+    inc dx
+    mov ax, dx
+    mov bl, 10
+    div bl
+    cmp ah, 0
+    jne drawCollumLoop2 
+     
+    ret
+drawCollum endp
 
 ;*****************************************************************
 ; paint2PixelsX - draws two pixels of a squar on screen
@@ -917,72 +658,153 @@ paint2PixelsY proc
 paint2PixelsY endp
 
 ;*****************************************************************
-; scanfNumb - scanf for int
-; descricao:
-; input - nothing
-; output - number in int placed in AX
-; destroi - ax
-;*****************************************************************
-scanfNumb proc
-    push bx
-    mov ax, 0
-    mov bl, 10
-    
-    L1ScanfNumb:
-    call getChar
-    cmp [DI-1], 0DH ; cmp with enter
-    je endScanfNumb
-    mul bl
-    sub [DI-1], 30H
-    add al, [DI-1]
-    jmp L1ScanfNumb
-    
-    endScanfNumb:
-    pop bx
-    ret
-scanfNumb endp
-
-;*****************************************************************
 ; scanf - string input
 ; descricao: rotina que faz o input de uma string ate o char ENTER
 ; input - DI = deslocamento da string a escrever desde o inicio do segmento de dados
 ; output - string
-; destroi - nada
+; destroi - ax, cx, dx, di
 ;*****************************************************************
 scanf proc
-    cmp bl, 01h ; check if its a numb and not a string
-    jne jmpScanfNumb
-    call scanfNumb
-    jmp endScanf2
     
-    jmpScanfNumb:
-    push ax
-    mov ax, MAXSTRSIZE
-    push ax
-    push di
+    mov bx, cx
     
-    L1Scanf:
-    call getChar
-    cmp [DI-1], 0DH ; cmp with enter
-    je endScanf
+    ScanLoop:
+        or cx, cx
+        jz endScan
     
-    pop ax
-    dec ax
-    or ax, ax
-    push ax
-    je endScanf ; cmp with max size
+        call getCharFromBuffer
+        jz ScanLoop
+        
+        cmp al, 1BH
+        STC
+        je endScan
+        CLC
+        
+        cmp al, 0Dh
+        je endScan
+        
+        cmp al, 08H
+        jne NotBackSpace
+        cmp bx, cx
+        je ScanLoop
+            push cx
+            call getCursorSizePosition
+            pop cx
+            
+            dec dl
+            push dx
+            call setCursorPosition
+            
+            mov al, 32
+            call co
+            pop dx
+            call setCursorPosition
+            
+            dec di
+            mov [di], 0
+            inc cx
+            
+            jmp ScanLoop
+        NotBackSpace:
+        
+        call co
+        
+        mov [di], al
+        inc di
+        dec cx
+        
+        jmp ScanLoop
+    endScan:
     
-    jmp L1Scanf
-    
-    endScanf:
-        mov [DI-1], 0
-        INC DI
-        pop ax
-        pop ax
-        pop di
-    endScanf2:
+    mov [di], 0
     ret
 scanf endp
+
+;*****************************************************************
+; fReadLine - read a line from file
+; descricao: rotine that reads a full line from file
+; input - bx, file handler to read
+;         dx, string to sotre line  
+; output - ax, number of bytes read
+;          strTemp, string read
+;          carry flag if end of file
+; destroi - dx, cx, si
+;*****************************************************************
+fReadLine proc
+    push bp
+    mov bp, sp
+    push 0 ; iniciar variavel local a 0
+    
+    ReadLineLoop:
+        inc [bp - 2]
+        xor cx, cx
+        inc cx
+        
+        call fread
+        
+        mov si, dx
+        
+        cmp [si], 0H
+        jne checkReadEnter
+            STC
+            jmp ReadLineEndLoop
+                
+        checkReadEnter:
+        cmp [si], 0AH
+        je ReadLineEndLoop
+        inc dx
+        
+        jmp ReadLineLoop
+    ReadLineEndLoop:
+    
+    mov [si], 0
+    pop ax
+    pop bp
+    ret
+fReadLine endp
+
+;*****************************************************************
+; fWriteLine - write a line to file
+; descricao: rotine that writes a full line to a file
+; input - bx, file handler to read
+;         dx, string to write  
+; output - strTemp, string read
+;          carry flag if end of file
+; destroi - cx, di, dx
+;*****************************************************************
+fWriteLine proc
+    
+    WriteLineLoop:
+        xor cx, cx
+        inc cx
+        
+        mov di, dx
+        cmp [di], 0
+        je WriteLineEndLoop
+        cmp [di], 0DH
+        je WriteLineEndLoop
+        
+        call fwrite
+        
+        inc dx        
+        jmp WriteLineLoop
+    WriteLineEndLoop:
+    
+    push dx
+    lea dx, strTemp
+    mov di, dx
+    mov [di], 0DH
+    mov [di+1], 0AH
+    mov cx, 2
+    call fwrite
+    
+    mov cx, 2
+    call clearString
+    
+    pop dx
+    
+    ret
+fWriteLine endp
 
 ;*****************************************************************
 ; waitOrInput - wait 10 seconds or for user inpur
@@ -1117,83 +939,83 @@ paintSquare endp
 ; destroy - dl
 ;*****************************************************************
 ErrorHandler proc
-    push dx
-    xor dl, dl
+    push bx
+    xor bx, bx
     
     cmp ax, 1
     jne skipError1
         lea dx, strInvFunc
-        inc dl
+        inc bl
     skipError1:
     
     cmp ax, 2h
     jne skipError2:
         lea dx, strNoFile
-        inc dl
+        inc bl
     skipError2:
     
     cmp ax, 3h
     jne skipError3:
         lea dx, strNoPath
-        inc dl
+        inc bl
     skipError3:
     
     cmp ax, 4h
     jne skipError4:
         lea dx, strHandleBusy
-        inc dl
+        inc bl
     skipError4:
     
     cmp ax, 5h
     jne skipError5:
         lea dx, strNoAccess
-        inc dl
+        inc bl
     skipError5:
     
     cmp ax, 6h
     jne skipError6:
         lea dx, strNoHandle
-        inc dl            
+        inc bl            
     skipError6:
     
     cmp ax, 0Ch
     jne skipError7:
         lea dx, strNoAccessCode
-        inc dl
+        inc bl
     skipError7:
         
     cmp ax, 0Fh
     jne skipError8:
         lea dx, strNoDrive
-        inc dl
+        inc bl
     skipError8:
     
     cmp ax, 10h
     jne skipError9:
         lea dx, strRemoveDir
-        inc dl
+        inc bl
     skipError9:
     
     cmp ax, 11h
     jne skipError10:
         lea dx, strNoDevice
-        inc dl
+        inc bl
     skipError10:
     
     cmp ax, 12h
     jne skipError11:
         lea dx, strNoFiles
-        inc dl
+        inc bl
     skipError11:
     
-    or dl, dl
+    or bl, bl
     jnz skipError12
         lea dx, strNoError
     skipError12:
             
     call printf 
     
-    pop dx     
+    pop bx          
     ret
 ErrorHandler endp
 
@@ -1240,59 +1062,33 @@ numToStr proc
 numToStr endp
 
 ;*****************************************************************
-; shiftStrRight - shift string to the right
-; descricao: routine that shifts every character in the string on byte to the right
-; input - si, start of the string
-;         cx, length of the string
-; output - nenhum
-; destroi - cx, dl 
-;*****************************************************************       
-shiftStrRight proc
-    
-    add si, cx
-    
-    shiftStrRightLoop:
-    
-        mov dl, [si - 1]
-        mov [si], dl
-        dec si    
-    
-    loop shiftStrRightLoop
-     
-    ret
-shiftStrRight endp
-
+; strToNum - put number in a string
+; descricao: routine that converts a string to a number
+; input - SI = start of string to conver
+;         cx = number of bytes to convert
+; output - AX, converted number
+; destroi - ax, bx, 
 ;*****************************************************************
-; assertStrLen - Assert string length
-; descricao: routine that checks if the string has the desired length, if not adds zeros to the beggining of it until it does
-; input - si, start of the string 
-;         cx, lenght of string
-;         bx, desired length of the string 
-; output - nenhum
-; destroi - si, cx 
-;*****************************************************************
-assertStrLen proc
-    push si
+strToNum proc
+    push bx
     
-    cmp cx, bx
-    jnb skipAssert
-        xchg cx, bx
-        sub cx, bx
+    xor ax, ax
+    mov bx, 10
+    
+    strToNumLoop:
+        mul bx
         
-        AssertionLoop:
-            push cx
-            mov cx, bx
-            call shiftStrRight
-            pop cx
-            mov [si], '0'
-            inc si
-            
-        loop AssertionLoop
-    skipAssert:
+        mov dx, [si]
+        sub dx, 30h
+        xor dh, dh
+        
+        add ax, dx
+        inc si
+    loop strToNumLoop
     
-    pop si
+    pop bx
     ret
-assertStrLen endp
+strToNum endp
 
 ;*****************************************************************
 ; constructButtonCenterX - Buttons on the center of the x position
@@ -1385,50 +1181,43 @@ paintMenuSqrs endp
 printMenuStr proc
     
     xor bh, bh
-    mov dh, 1
-    mov dl, 15
+    mov dx, 010Fh
     call setCursorPosition
     
     lea dx, strMenu
     call printf
     
-    mov dh, 5
-    mov dl, 18
+    mov dx, 0512h
     call setCursorPosition
     
     lea dx, strPlay
     call printf
     
-    mov dh, 8
-    mov dl, 18
+    mov dx, 0812h
     call setCursorPosition
     
     lea dx, strLoad
     call printf
     
-    mov dh, 11
-    mov dl, 18
+    mov dx, 0B12h
     call setCursorPosition
     
     lea dx, strSave
     call printf
     
-    mov dh, 14
-    mov dl, 17
+    mov dx, 0E11h
     call setCursorPosition
     
     lea dx, strTop5
     call printf
     
-    mov dh, 17
-    mov dl, 16
+    mov dx, 1110h
     call setCursorPosition
     
     lea dx, strCredits
     call printf
     
-    mov dh, 20
-    mov dl, 18
+    mov dx, 1412h
     call setCursorPosition
     
     lea dx, strExit
@@ -1442,11 +1231,12 @@ printMenuStr endp
 ; descricao: copy an entire string onto a part of another
 ; input - si = start of string to copy (must end with 0)
 ;         di = where to start copying to in destination string (lea of string if beggining lea of string + 3 if 3 bytes after the beggining of string)
+;         cx = numero de bytes a copiar
 ; output - nenhum
 ; destroi - dl, di 
 ;*****************************************************************
 copyToStr proc
-    push si
+    push si 
     
     copyToStrLoop:
     
@@ -1468,42 +1258,40 @@ copyToStr endp
 ;*****************************************************************
 ; clearString - clears part of a string
 ; descricao:
-; input - si = where to start clearing the string 
+; input - di = where to start clearing the string 
 ;         cx = number of bytes to clear from string
 ; output - nenhum
 ; destroi - cx 
 ;*****************************************************************
 clearString proc
-    push si
+    push di
     
-    clearStringLoop:
-        
-        mov [si], 0
-        inc si
-        
-    loop clearStringLoop
+    mov al, 0
+    rep stosb
     
-    pop si  
+    pop di  
     ret 
 clearString endp
 
 ;*****************************************************************
 ; strLen - Length of string
 ; descricao: routine that determines the length of a string
-; input - si, start of string (must end in 0)
+; input - si, start of string
+;         dx, character that ends the string
 ; output - cx, length of string
-; destroi - si, cx 
+; destroi - cx 
 ;*****************************************************************
 strLen proc
     push si
     xor cx, cx       
            
     strLenLoop:
+        
+        cmp [si], dl
+        je strLenEndLoop
+        
         inc cx
         inc si
-        
-        cmp [si], 0
-        je strLenEndLoop
         
         jmp strLenLoop
     strLenEndLoop:
@@ -1542,7 +1330,7 @@ shiftStrRight endp
 ;         cx, lenght of string
 ;         bx, desired length of the string 
 ; output - nenhum
-; destroi - si, cx 
+; destroi - cx 
 ;*****************************************************************
 assertStrLen proc
     push si
@@ -1577,28 +1365,35 @@ assertStrLen endp
 ; output - nenhum
 ; destroi - cx 
 ;*****************************************************************
-processIntStr proc
-    
+processIntStr proc   
     push si
-    call strToInt
+    call numToStr
     pop si
     
-    call strLen
+    push dx
+    xor dx, dx      ; determina o caracter terminal na verificacao do strLen
+    call strLen     ; determines length of string
     cmp cx, bx
+    pop dx
         
     jnb pushReal
-    push bx 
-    jmp pushBX
+    push bx           ; determina se vai fazer assert da string ou nao
+    call assertStrLen ; se fizer push de bx, vai fazer assert pois temos uma string mais pequena que o desejado
+    jmp pushBX      
     
     pushReal:
     push cx
     pushBX:
     
-    call assertStrLen
     call copyToStr
     
     pop cx    
+    push di
+    
+    mov di, si    
     call clearString
+    
+    pop di
     ret
     
 processIntStr endp
@@ -1617,7 +1412,7 @@ insertDateInStr proc
     push dx    
     
     mov ax, cx
-    call strToInt
+    call numToStr
     
     mov di, si
     
@@ -1679,10 +1474,12 @@ buildLogStr proc
     lea si, strLog
     call insertDateInStr
     
+    mov [di], ":"
     inc di
     
     call insertTimeInStr
     
+    mov [di], ":"
     inc di
     push si
     
@@ -1715,17 +1512,55 @@ buildLogStr proc
 buildLogStr endp
 
 ;*****************************************************************
-; writeLog - writes a log entry
-; description: routine that writes a log entry 
-; input - nothing
-; output - nothing 
-; destroy - ax, bx, cx, dx, si, di
-;*****************************************************************  
-writeLog proc
+; openLogFile - open log file
+; description: routine that opens the log file or creates it and it's directory if it doesn't exit 
+; input - nada
+; output - bx, file handler 
+; destroy - ax, bx, dx
+;*****************************************************************
+openLogFile proc
     
     lea dx, logFile
     mov al, 3
     call fopen
+    
+    jnc SkipCreateLog
+        
+        cmp ax, 2h
+        je SkipCreateLogPath
+        
+        cmp ax, 3h
+        jne SkipCreateLogPath
+            lea dx, FilesPath
+            call createDir
+        SkipCreateLogPath:
+        
+        lea dx, logFile
+        xor cx, cx
+        call fcreate
+        
+        lea dx, logFile
+        mov al, 3
+        call fopen
+        
+        call ci
+        cmp al, 27
+        jne SkipCreateTop
+            call returnOs
+            
+    SkipCreateLog:
+    
+    ret
+openLogFile endp
+
+;*****************************************************************
+; writeLog - writes a log entry
+; description: routine that writes a log entry 
+; input - bx, file to write the log
+; output - nothing 
+; destroy - ax, bx, cx, dx, si, di
+;*****************************************************************  
+writeLog proc
     
     push bx
     call buildLogStr
@@ -1737,38 +1572,407 @@ writeLog proc
     sub cx, di          ; and writes that string to log file
     call fwrite         
     
-    call fclose
-    
     ret
 writeLog endp
+
+;*****************************************************************
+; openTop5 - open top 5 file
+; description: routine that opens the log file or creates it and it's directory if it doesn't exit 
+; input - nada
+; output - bx, file handler 
+; destroy - ax, bx, dx
+;*****************************************************************
+openTop5 proc
+    
+    lea dx, TopFile
+    mov al, 2
+    call fopen
+    jnc SkipCreateTop
+        
+        cmp ax, 2h
+        je SkipCreateTopPath
+        
+        cmp ax, 3h
+        jne SkipCreateTopPath
+            lea dx, FilesPath
+            call createDir
+        SkipCreateTopPath:
+        
+        lea dx, TopFile
+        xor cx, cx
+        call fcreate
+        
+        lea dx, TopFile
+        mov al, 3
+        call fopen
+        
+        call ci
+        cmp al, 27
+        jne SkipCreateTop
+            call returnOs    
+            
+    SkipCreateTop:
+    
+    ret
+openTop5 endp
+
+;*****************************************************************
+; calcPointsFromLog - Calculates points from log string
+; descricao: rotine that calculates the points a user has from a string with the same structure as the log string
+; input - si, beggining of the string  
+; output - ax, user points
+; destroi - si, dx, ax, cx
+;*****************************************************************
+calcPointsFromLog proc
+
+    add si, 16
+    
+    skipCheckUserName:
+        inc si
+        cmp [si], ":"    ; advances the str pointer until it finds the next :
+        jne skipCheckUserName
+
+   
+    inc si
+    mov cx, 3
+    call strToNum
+    mov dx, ax
+    
+    mov ax, [si]
+    
+    push dx
+    inc si
+    mov cx, 4
+    call strToNum
+    pop dx
+    add ax, dx
+    
+    ret
+calcPointsFromLog endp
+
+;*****************************************************************
+; checkTop5 - check top 5
+; descricao: rotine that sees if the new player should be part of the top 5 file
+; input - bx, file handler  
+; output - nada
+; destroi - bx, cx, dx, si, di
+;*****************************************************************
+checkTop5 proc
+    push bp
+    mov bp, sp
+    
+    ; incializar variaveis a 0
+    push 0
+    push 0
+    push 0
+    push 0
+    
+    mov dx, genNum
+    add dx, cellNum
+    mov [bp - 6], dx
+    
+    checkTop5Loop:
+    
+        inc [bp - 2] 
+        
+        lea dx, strTemp  
+        call fReadLine
+        jnc skipCheckReadFlagSet
+            inc [bp - 8]
+            jmp checkTop5EndLoop
+        skipCheckReadFlagSet:
+        
+        push ax
+        
+        lea si, strTemp
+        call calcPointsFromLog
+        
+        cmp [bp - 6], ax
+        pop ax
+        ja checkTop5EndLoop
+        
+        cmp [bp - 2], 5
+        je checkTop5EndLoop
+        
+        add [bp - 4], ax
+        
+        mov dx, [bp - 4]
+        xor al, al
+        xor cx, cx
+        call fseek
+        
+        lea di, strTemp
+        mov cx, 41
+        call clearString
+        
+        jmp checkTop5Loop 
+    checkTop5EndLoop:
+    
+    lea di, strTemp
+    mov cx, 41
+    call clearString
+    
+    or [bp - 8], 0
+    jz WriteOver:
+    
+        cmp [bp - 2], 5
+        je endCheckTop5
+        
+        lea dx, strLog
+        call fWriteLine
+        jmp endCheckTop5
+    
+    WriteOver:
+        
+        mov dx, [bp - 4]
+        xor al, al
+        xor cx, cx
+        call fseek
+    
+        mov cx, 5
+        sub cx, [bp - 2]
+        lea dx, strTemp
+        add dx, 2
+        
+        readRestOfTop5Loop:
+            
+            or cx, 0
+            jz readRestOfTop5EndLoop
+            
+            push cx
+            call fReadLine
+            pop cx
+            jc readRestOfTop5EndLoop
+         
+            dec cx   
+            
+            jmp readRestOfTop5Loop
+        readRestOfTop5EndLoop:
+        
+        mov dx, 5
+        sub dx, cx
+        sub cx, [bp - 2]  ; calcula a quantidade de linhas que tenho de escrever
+        push dx
+         
+        mov dx, [bp - 4] 
+        xor al, al
+        xor cx, cx
+        call fseek
+        
+        lea dx, strLog
+        call fWriteLine
+        
+        lea dx, strTemp
+        add dx, 2
+        pop cx
+        
+        writeRestOfTop5Loop:
+        
+            push cx
+            call fWriteLine
+            inc dx
+            pop cx
+        
+        loop writeRestOfTop5Loop
+        
+        mov cx, 246
+        call clearString
+    endCheckTop5:
+    
+    add sp, 8
+    pop bp
+    ret
+checkTop5 endp
 
 ;*****************************************************************
 ; gamePlay - sets up the game
 ; descricao: rotine that sets up the game
 ; input - nada  
 ; output - nada
-; destroi - ax, bx, cx, dx, si, di
+; destroi - bx, cx, dx, si, di
 ;*****************************************************************
 initGamePlay proc
-    
-    call initgraph
+    push ax 
+    call hideMouseCursor
+    call clearGraph
     
     xor bx, bx
-    mov dx, 0
+    mov dx, 0B0CH
     call setCursorPosition
     
     lea dx, strGetPlayerName
     call printf
     
+    mov dx, 0C0FH
+    call setCursorPosition
+    
+    mov cx, 10
     lea di, strPlayerName
     call scanf
+    jc endInitGame
     
+    call showMouseCursor
     ;insert call to game here
     
+    call openLogFile
     call writeLog
+    call fclose
+    
+    xor bx, bx
+    call openTop5
+    call checkTop5
+    call fclose
+    
+    endInitGame:
+    
+    pop ax
+    ret
+initGamePlay endp
+
+processTop5Str proc
+    
+    mov si, dx
+        sub si, 9
+        mov cx, 3
+        lea di, strTemp
+        
+        rep movsb
+        
+        mov cx, 4
+        inc si
+        inc di
+        
+        rep movsb
+        
+        sub si, 9
+        
+        xor ax, ax
+        skipReadUserName:
+            inc ax
+            dec si
+            cmp [si], ':'
+            jne skipReadUserName
+        
+        add di, 2
+        inc si
+        dec ax
+        push si
+        
+        mov cx, ax 
+        rep movsb
+        
+        pop si
+        
+        sub si, 14
+            
+        mov dx, MAXPLAYERNAME
+        sub dx, ax
+        add di, dx
+        mov cx, 2
+        rep movsb
+        
+        mov [di], '\'
+        inc di
+        
+        mov cx, 2
+        rep movsb
+        
+        mov [di], '\'
+        inc di
+        
+        mov cx, 2
+        rep movsb
+        
+        inc si
+        inc di
+        mov cx, 2
+        rep movsb
+        
+        mov [di], ':'
+        inc di
+        
+        mov cx, 2
+        rep movsb
+        
+        mov [di], ':'
+        inc di
+        
+        mov cx, 2
+        rep movsb
+        mov [di], '$'
     
     ret
-initGamePlay endp    
+processTop5Str endp    
+
+;*****************************************************************
+; displayTop5 - display the top 5 players
+; descricao: rotine that displays the top 5 saves
+; input - nada  
+; output - nada
+; destroi - dx, bx
+;*****************************************************************
+displayTop5 proc
+    push bp
+    mov bp, sp
+    ; inicialize variables at 0
+    push 0
+    push 0
+    
+    push ax
+    call hideMouseCursor
+    call clearGraph
+    
+    push bx
+    xor bx, bx
+    mov dx, 0301h
+    call setCursorPosition
+    pop bx
+    
+    lea dx, strTop5Screen
+    call printf
+    
+    call openTop5
+    mov [bp - 2], 5
+    mov [bp - 4], 0501h
+    DisplayReadTop5Loop:
+        
+        lea dx, strTemp
+        add dx, 41
+        call fReadLine
+        jc DisplayReadEndTop5Loop  ; termina o loop quando chegar ao final do ficheiro
+                         
+        call processTop5Str
+        
+        push bx
+        xor bx, bx
+        mov dx, [bp - 4]
+        call setCursorPosition
+        pop bx
+        
+        lea dx, strTemp
+        call printf
+        
+        mov cx, 122
+        lea di, strTemp
+        call clearString
+        
+        add [bp - 4], 0200h
+        
+        or [bp - 4], 0
+        jz DisplayReadEndTop5Loop
+        
+        jmp DisplayReadTop5Loop           
+    DisplayReadEndTop5Loop: 
+    
+    call fclose
+    
+    call waitOrInput
+    
+    pop ax
+    add sp, 4
+    pop bp
+    ret
+displayTop5 endp    
 
 ;*****************************************************************
 ; rollCredits - roll credits
@@ -1780,18 +1984,17 @@ initGamePlay endp
 rollCredits proc
     push ax
     
-    call initGraph
+    call clearGraph
+    call hideMouseCursor
     
     xor bh, bh
-    mov dh, 11
-    mov dl, 6
+    mov dx, 0B06h
     call setCursorPosition
     
     lea dx, strDiogo
     call printf
     
-    mov dh, 13
-    mov dl, 4
+    mov dx, 0D04h
     call setCursorPosition
     
     lea dx, strFilipe
@@ -1818,7 +2021,7 @@ clickMenu proc
     cmp dx, 51
     jae skipButton1
     
-    call gamePlay
+    call initGamePlay
     ret
     skipButton1:
     
@@ -1842,7 +2045,8 @@ clickMenu proc
     jbe skipButton4
     cmp dx, 123
     jae skipButton4
-         
+    
+    call displayTop5     
     ret             
     skipButton4:
     
@@ -1882,7 +2086,53 @@ startMenu proc
     call paintMenuSqrs           ; os quadrados tem todos a mesma posicao inicial e final no eixo dos x
     
     startLoop:
+    
+        call getCharFromBuffer
+        jz startMousePos
+            
+            xor dx, dx           ; dependendo do valor de al, vamos mudar o valor de dx vai ser 
+                                 ; mudado para o valor da posicao do botao correspondente no ecra
+            cmp al, '1'
+            jne stratSwitch1
+                mov dx, 40
+            stratSwitch1:
+            
+            cmp al, '2'
+            jne stratSwitch2
+                mov dx, 70
+            stratSwitch2:
+            
+            cmp al, '3'
+            jne stratSwitch3
+                mov dx, 90
+            stratSwitch3:
+            
+            cmp al, '4'
+            jne stratSwitch4
+                mov dx, 110
+            stratSwitch4:
+            
+            cmp al, '5'
+            jne stratSwitch5
+                mov dx, 140
+            stratSwitch5:
+            
+            cmp al, '6'
+            jne stratSwitch6
+                mov dx, 160
+            stratSwitch6:
+            
+            cmp al, 1BH
+            jne stratSwitch7
+                mov dx, 160
+            stratSwitch7:
+            
+            or dx, dx
+            jz startLoop 
+            
+            jmp startClick
         
+        startMousePos:
         call getMousePos
         shr cx, 1
          
@@ -1895,6 +2145,7 @@ startMenu proc
             cmp cx, 199          ; quadrados antes de verificar o quadrado que estamos a clicar
             jae skipButtons
             
+            startCLick:
             call clickMenu
             
             or ah, ah
