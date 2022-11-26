@@ -1,9 +1,10 @@
 data segment
     MAXPLAYERNAME equ 11
-    MAXBUFFERSIZE equ 41*4      
+    MAXLOGSTRSIZE equ MAXPLAYERNAME + 26
+    MAXBUFFERSIZE equ (MAXLOGSTRSIZE * 4) + 2      
     GRIDCOLOR equ 27
     SQUARECOLOR equ 15
-    logFile db "C:\ConwayGame\Log.txt", 0
+    logFile db "C:\ConwayGame\Log.txt", 0        
     TopFile db "C:\ConwayGame\Top5.txt", 0
     FilesPath db "C:\ConwayGame\", 0
     strOpenError db "Error on open: $"
@@ -36,11 +37,12 @@ data segment
     strGetPlayerName db "Enter username: $"
     strDiogo db "Diogo Matos Novais  n", 0A7h, " 62506$"
     strFilipe db "Filipe Silva Cavalheiro n", 0A7h, " 62894$"
-    strLog db 28 dup(0), MAXPLAYERNAME dup(0), 0DH, 0AH, 0 
+    strLog db MAXLOGSTRSIZE dup(0) 
     strPlayerName db MAXPLAYERNAME dup(0)
     strTemp db MAXBUFFERSIZE dup(0)
-    genNum dw 128
-    cellNum dw 158
+    genNum dw 137
+    cellNum dw 167
+
     xI dw 1
     yI dw 1
     xF dw 1
@@ -55,16 +57,20 @@ code segment
 start:
     mov ax, data
     mov ds, ax
-    mov es, ax         
+    mov es, ax
     
     call initGraph
-    call initMouse
+    call initGamePlay     
     
-    loop1:
-        call showMouseCursor
-        call startMenu
-        call clearGraph
-    jmp loop1
+    ;call initGraph
+    ;call initMouse
+    ;call showMouseCursor
+    
+    ;loop1:
+    ;    call showMouseCursor
+    ;    call startMenu
+    ;    call clearGraph
+    ;jmp loop1
     
     mov ax,4c00h ; terminate program
     int 21h
@@ -661,6 +667,7 @@ paint2PixelsY endp
 ; scanf - string input
 ; descricao: rotina que faz o input de uma string ate o char ENTER
 ; input - DI = deslocamento da string a escrever desde o inicio do segmento de dados
+;         cx, numero maximo de characteres a receber + 1
 ; output - string
 ; destroi - ax, cx, dx, di
 ;*****************************************************************
@@ -706,6 +713,9 @@ scanf proc
             
             jmp ScanLoop
         NotBackSpace:
+        
+        cmp cx, 1
+        je ScanLoop
         
         call co
         
@@ -1505,9 +1515,6 @@ buildLogStr proc
     inc di
     
     mov [di], 0AH
-    inc di
-    
-    mov [di], 0
     ret
 buildLogStr endp
 
@@ -1621,10 +1628,11 @@ openTop5 endp
 ; descricao: rotine that calculates the points a user has from a string with the same structure as the log string
 ; input - si, beggining of the string  
 ; output - ax, user points
-; destroi - si, dx, ax, cx
+; destroi - si, dx, ax
 ;*****************************************************************
 calcPointsFromLog proc
-
+    push cx
+    
     add si, 16
     
     skipCheckUserName:
@@ -1647,52 +1655,52 @@ calcPointsFromLog proc
     pop dx
     add ax, dx
     
+    pop cx
     ret
 calcPointsFromLog endp
 
 ;*****************************************************************
-; checkTop5 - check top 5
-; descricao: rotine that sees if the new player should be part of the top 5 file
-; input - bx, file handler  
-; output - nada
-; destroi - bx, cx, dx, si, di
+; calcNewTop5 - calculate new user position in top 5
+; descricao: rotine that calculates the new user position within the scoreboard
+; input - bx, file handler
+;         push 1, new user value  
+; output - ax, number of bytes read from last line of top 5 file
+;          cx, new player position in top 5
+;          dx, position in file to write the new user in
+;          CF, set if reached end of file
+; destroi - ax, cx, dx, si, di
 ;*****************************************************************
-checkTop5 proc
+calcNewTop5 proc
     push bp
     mov bp, sp
-    
-    ; incializar variaveis a 0
-    push 0
-    push 0
+    ; inicialize local variavel at 0
     push 0
     push 0
     
-    mov dx, genNum
-    add dx, cellNum
-    mov [bp - 6], dx
+    xor cx, cx
     
-    checkTop5Loop:
-    
-        inc [bp - 2] 
+    calcNewTop5Loop: 
         
-        lea dx, strTemp  
+        inc [bp - 2]
+        
+        lea dx, strTemp + 2 
         call fReadLine
         jnc skipCheckReadFlagSet
-            inc [bp - 8]
-            jmp checkTop5EndLoop
+            STC
+            jmp calcNewTop5EndLoop
         skipCheckReadFlagSet:
         
         push ax
         
-        lea si, strTemp
+        lea si, strTemp + 2
         call calcPointsFromLog
         
-        cmp [bp - 6], ax
+        cmp [bp + 4], ax
         pop ax
-        ja checkTop5EndLoop
+        ja calcNewTop5EndLoop
         
         cmp [bp - 2], 5
-        je checkTop5EndLoop
+        je calcNewTop5EndLoop
         
         add [bp - 4], ax
         
@@ -1701,95 +1709,261 @@ checkTop5 proc
         xor cx, cx
         call fseek
         
-        lea di, strTemp
-        mov cx, 41
+        lea di, strTemp + 2
+        mov cx, MAXLOGSTRSIZE
         call clearString
         
-        jmp checkTop5Loop 
-    checkTop5EndLoop:
+        jmp calcNewTop5Loop 
+    calcNewTop5EndLoop:
     
-    lea di, strTemp
-    mov cx, 41
-    call clearString
+    pop dx
+    pop cx
+    pop bp
+    ret 2
+calcNewTop5 endp
+
+;*****************************************************************
+; appendToTop5 - add a new entry to the bottom of top 5 
+; descricao: rotine that appends an entry to the top 5 file (does not overwrite any data)
+; input - bx, file handler
+;         dx, position to write in file  
+; output - dx, last position writen to file (from beggining)
+; destroy - cx, dx, si
+;*****************************************************************
+appendToTop5 proc
+    push dx
     
-    or [bp - 8], 0
-    jz WriteOver:
+    xor al, al
+    xor cx, cx
+    call fseek
     
-        cmp [bp - 2], 5
-        je endCheckTop5
+    lea si, strLog
+    mov dx, 0AH
+    call strLen
+    inc cx
+    
+    mov dx, si
+    call fwrite
+    
+    pop dx    
+    add dx, cx
+    ret
+appendToTop5 endp
+
+;*****************************************************************
+; clearRestOfFile - clear rest of file
+; descricao: rotine that erases all data since input position to end of file
+; input - bx, file handler
+;         dx, position you wish to start deleting from  
+; output - nothing
+; destroy - cx, dx
+;*****************************************************************
+clearRestOfFile proc
+    push dx
+    
+    mov al, 2
+    xor cx, cx
+    xor dx, dx
+    call fseek
+    
+    pop dx
+    
+    cmp ax, dx
+    jbe skipClearFile
+    
+    sub ax, dx          ; number of bytes to erase
+    push ax
+    
+    xor al, al
+    call fseek
+    
+    pop cx
+    lea dx, strTemp
+    call fwrite
+    
+    skipClearFile:
+    ret
+clearRestOfFile endp
+
+;*****************************************************************
+; readRelScor - read relevant scoreboard
+; descricao: rotine that loads to memory the players deserving to be on the scoreboard after the new user 
+; input - bx, file handler
+;         cx, number of lines already read from the file
+;         dx, position to start reading from file
+; output - dx, last position read from file
+;          cx, number of lines not read from file (because they don't exist)
+;          ax, number of bytes already in memory
+; destroy - ax, cx, dx
+;*****************************************************************
+readRelScor proc
+    
+    push si
+    mov si, dx
+    
+    push ax
+    push cx
+    xor al, al
+    xor cx, cx
+    call fseek
+    
+    pop dx
+          
+    mov cx, 4           ; executa o read loop no maximo 4 vezes (contando com o 0)
+    sub cx, dx
+    lea dx, strTemp
+    
+    pop ax
+    inc ax
+    add dx, ax
+    
+    readRestOfTop5Loop:
         
-        lea dx, strLog
+        or cx, cx
+        jz readRestOfTop5EndLoop
+        
+        push cx
+        push si
+        call fReadLine
+        pop si
+        pushF
+        add si, ax
+        popF
+        pop cx
+        jc readRestOfTop5EndLoop
+     
+        dec cx   
+        
+        jmp readRestOfTop5Loop
+    readRestOfTop5EndLoop: 
+    
+    mov dx, si
+    pop si
+    ret
+readRelScor endp
+
+;*****************************************************************
+; writeRelScor - write relevant scoreboard
+; descricao: rotine that writes the memory loaded from the top 5 file 
+; input - bx, file handler
+;         cx, number of lines not read
+;         dx, line to position new user
+;         di, position in the file to write the new user
+;         push 1, last position read from
+; output - ax, number of bytes already in memory
+;          push 1, last position written to
+; destroy - ax, cx, dx, si
+;*****************************************************************
+writeRelScor proc
+    push bp
+    mov bp, sp
+    
+    mov si, 5
+    sub si, cx
+    sub si, dx  ; calcula a quantidade de linhas que tenho de escrever
+    push si
+     
+    mov dx, di 
+    xor al, al
+    xor cx, cx
+    call fseek
+    
+    lea si, strLog
+    mov dx, 0AH
+    call strLen
+    inc cx
+    add [bp + 4], cx
+    
+    mov dx, si
+    call fwrite
+    
+    lea dx, strTemp + 2
+    pop cx
+    
+    writeRestOfTop5Loop:
+        
+        or cx, cx
+        jz writeRestOfTop5EndLoop
+        
+        push cx
         call fWriteLine
+        inc dx
+        pop cx
+        
+        dec cx
+        
+        jmp writeRestOfTop5Loop
+        
+    writeRestOfTop5EndLoop:
+    
+    pop bp
+    ret
+writeRelScor endp
+
+;*****************************************************************
+; checkTop5 - check top 5
+; descricao: rotine that sees if the new player should be part of the top 5 file
+; input - bx, file handler  
+; output - nada
+; destroy - bx, cx, dx, si, di
+;*****************************************************************
+checkTop5 proc
+    push bp
+    mov bp, sp
+    sub sp, 4
+    
+    mov dx, genNum
+    add dx, cellNum                 ; player value for the top 5 scoreboard
+    
+    push dx
+    call calcNewTop5
+    
+    jnc WriteOver:
+        
+        cmp cx, 5
+        je endCheckTop5
+                                               
+        call appendToTop5           ; write to file
+        
         jmp endCheckTop5
     
     WriteOver:
         
-        mov dx, [bp - 4]
-        xor al, al
-        xor cx, cx
-        call fseek
-    
-        mov cx, 5
-        sub cx, [bp - 2]
-        lea dx, strTemp
-        add dx, 2
+        cmp cx, 5
+        je endCheckTop5
         
-        readRestOfTop5Loop:
-            
-            or cx, 0
-            jz readRestOfTop5EndLoop
-            
-            push cx
-            call fReadLine
-            pop cx
-            jc readRestOfTop5EndLoop
-         
-            dec cx   
-            
-            jmp readRestOfTop5Loop
-        readRestOfTop5EndLoop:
+        mov [bp - 2], cx
+        mov [bp - 4], dx
         
-        mov dx, 5
-        sub dx, cx
-        sub cx, [bp - 2]  ; calcula a quantidade de linhas que tenho de escrever
+        add dx, ax
+        call readRelScor
+        
         push dx
-         
-        mov dx, [bp - 4] 
-        xor al, al
-        xor cx, cx
-        call fseek
+        mov dx, [bp - 2]
+        mov di, [bp - 4]
+        call writeRelScor
         
-        lea dx, strLog
-        call fWriteLine
+        pop dx
         
-        lea dx, strTemp
-        add dx, 2
-        pop cx
+        lea si, strTemp
+        mov cx, MAXBUFFERSIZE
+        call clearString        
         
-        writeRestOfTop5Loop:
-        
-            push cx
-            call fWriteLine
-            inc dx
-            pop cx
-        
-        loop writeRestOfTop5Loop
-        
-        mov cx, 246
-        call clearString
     endCheckTop5:
     
-    add sp, 8
+    call clearRestOfFile
+   
+    add sp, 4
     pop bp
     ret
 checkTop5 endp
 
 ;*****************************************************************
 ; gamePlay - sets up the game
-; descricao: rotine that sets up the game
-; input - nada  
-; output - nada
-; destroi - bx, cx, dx, si, di
+; descricao: rotine that sets up the game and ends the game
+; input - nothing  
+; output - nothing
+; destroy - bx, cx, dx, si, di
 ;*****************************************************************
 initGamePlay proc
     push ax 
@@ -1806,7 +1980,7 @@ initGamePlay proc
     mov dx, 0C0FH
     call setCursorPosition
     
-    mov cx, 10
+    mov cx, MAXPLAYERNAME
     lea di, strPlayerName
     call scanf
     jc endInitGame
@@ -1815,7 +1989,7 @@ initGamePlay proc
     ;insert call to game here
     
     call openLogFile
-    call writeLog
+    call writeLog               
     call fclose
     
     xor bx, bx
@@ -1823,93 +1997,104 @@ initGamePlay proc
     call checkTop5
     call fclose
     
+    mov cx, MAXLOGSTRSIZE
+    lea si, strLog
+    call clearString
+    
     endInitGame:
     
     pop ax
     ret
 initGamePlay endp
 
+;*****************************************************************
+; processTop5Str - process top 5 string
+; descricao: rotine takes a log like string and transforms it into a user friendly string
+; input - dx, position of string to alter  
+; output - strTemp, string to be printed
+; destroy - bx, cx, dx, si, di
+;*****************************************************************
 processTop5Str proc
     
     mov si, dx
-        sub si, 9
-        mov cx, 3
-        lea di, strTemp
-        
-        rep movsb
-        
-        mov cx, 4
-        inc si
-        inc di
-        
-        rep movsb
-        
-        sub si, 9
-        
-        xor ax, ax
-        skipReadUserName:
-            inc ax
-            dec si
-            cmp [si], ':'
-            jne skipReadUserName
-        
-        add di, 2
-        inc si
-        dec ax
-        push si
-        
-        mov cx, ax 
-        rep movsb
-        
-        pop si
-        
-        sub si, 14
-            
-        mov dx, MAXPLAYERNAME
-        sub dx, ax
-        add di, dx
-        mov cx, 2
-        rep movsb
-        
-        mov [di], '\'
-        inc di
-        
-        mov cx, 2
-        rep movsb
-        
-        mov [di], '\'
-        inc di
-        
-        mov cx, 2
-        rep movsb
-        
-        inc si
-        inc di
-        mov cx, 2
-        rep movsb
-        
-        mov [di], ':'
-        inc di
-        
-        mov cx, 2
-        rep movsb
-        
-        mov [di], ':'
-        inc di
-        
-        mov cx, 2
-        rep movsb
-        mov [di], '$'
+    sub si, 9
+    mov cx, 3
+    lea di, strTemp
     
+    rep movsb                       ; unpacks number of genarations the player had in game
+    
+    mov cx, 4
+    inc si
+    inc di
+    
+    rep movsb                       ; unpacks number of live cells the player had in game
+    
+    sub si, 9
+    
+    xor ax, ax
+    skipReadUserName:
+        inc ax
+        dec si                      ; loop that finds out the beggining position
+        cmp [si], ':'               ; of the username
+        jne skipReadUserName
+    
+    add di, 2
+    inc si
+    dec ax
+    push si
+    
+    mov cx, ax                      ; unpacks the username
+    rep movsb
+    
+    pop si
+    
+    sub si, 14
+        
+    mov dx, MAXPLAYERNAME
+    sub dx, ax                      ; unpacks the year
+    add di, dx
+    mov cx, 2
+    rep movsb
+    
+    mov [di], '\'
+    inc di
+    
+    mov cx, 2                       ; unpacks the month
+    rep movsb
+    
+    mov [di], '\'
+    inc di
+                                    ; unpacks the day
+    mov cx, 2
+    rep movsb
+    
+    inc si
+    inc di
+    mov cx, 2                       ; unpacks the hours
+    rep movsb
+    
+    mov [di], ':'
+    inc di
+    
+    mov cx, 2
+    rep movsb                       ; unpacks the minutes
+    
+    mov [di], ':'
+    inc di
+    
+    mov cx, 2                       ; unpacks the seconds
+    rep movsb                       ; adds the end character for the printf function
+    mov [di], '$'
+
     ret
 processTop5Str endp    
 
 ;*****************************************************************
 ; displayTop5 - display the top 5 players
-; descricao: rotine that displays the top 5 saves
-; input - nada  
-; output - nada
-; destroi - dx, bx
+; descricao: rotine that displays the top 5 players to screen
+; input - nothing  
+; output - nothing
+; destroy - bx, cx, dx, si, di
 ;*****************************************************************
 displayTop5 proc
     push bp
@@ -1922,22 +2107,24 @@ displayTop5 proc
     call hideMouseCursor
     call clearGraph
     
-    push bx
     xor bx, bx
     mov dx, 0301h
     call setCursorPosition
-    pop bx
     
     lea dx, strTop5Screen
     call printf
     
     call openTop5
+    
     mov [bp - 2], 5
     mov [bp - 4], 0501h
+    
     DisplayReadTop5Loop:
         
-        lea dx, strTemp
-        add dx, 41
+        or [bp - 2], 0
+        jz DisplayReadEndTop5Loop
+        
+        lea dx, strTemp + MAXLOGSTRSIZE
         call fReadLine
         jc DisplayReadEndTop5Loop  ; termina o loop quando chegar ao final do ficheiro
                          
@@ -1952,15 +2139,14 @@ displayTop5 proc
         lea dx, strTemp
         call printf
         
-        mov cx, 122
+        mov cx, MAXLOGSTRSIZE + MAXLOGSTRSIZE
         lea di, strTemp
         call clearString
         
         add [bp - 4], 0200h
         
-        or [bp - 4], 0
-        jz DisplayReadEndTop5Loop
-        
+        dec [bp - 2] 
+         
         jmp DisplayReadTop5Loop           
     DisplayReadEndTop5Loop: 
     
@@ -1977,9 +2163,9 @@ displayTop5 endp
 ;*****************************************************************
 ; rollCredits - roll credits
 ; descricao: rotine that "rolls" the credits
-; input - nada  
-; output - nada
-; destroi - dx, bx
+; input - nothing  
+; output - nothing
+; destroy - dx, bh
 ;*****************************************************************
 rollCredits proc
     push ax
@@ -1988,15 +2174,15 @@ rollCredits proc
     call hideMouseCursor
     
     xor bh, bh
-    mov dx, 0B06h
+    mov dx, 0D06h
     call setCursorPosition
-    
-    lea dx, strDiogo
+                                ; prints dev 1
+    lea dx, strDiogo                   
     call printf
     
-    mov dx, 0D04h
+    mov dx, 0B04h
     call setCursorPosition
-    
+                                ; prints dev 2
     lea dx, strFilipe
     call printf
     
@@ -2018,7 +2204,7 @@ clickMenu proc
     
     cmp dx, 35
     jbe skipButton1
-    cmp dx, 51
+    cmp dx, 51              ; button 1 (play)
     jae skipButton1
     
     call initGamePlay
@@ -2027,7 +2213,7 @@ clickMenu proc
     
     cmp dx, 59
     jbe skipButton2
-    cmp dx, 75
+    cmp dx, 75              ; button 2 (load)
     jae skipButton2
               
     ret       
@@ -2035,7 +2221,7 @@ clickMenu proc
     
     cmp dx, 83
     jbe skipButton3
-    cmp dx, 99
+    cmp dx, 99              ; button 3 (save)
     jae skipButton3
               
     ret       
@@ -2043,7 +2229,7 @@ clickMenu proc
     
     cmp dx, 107
     jbe skipButton4
-    cmp dx, 123
+    cmp dx, 123             ; button 4 (Top 5)
     jae skipButton4
     
     call displayTop5     
@@ -2052,7 +2238,7 @@ clickMenu proc
     
     cmp dx, 131
     jbe skipButton5
-    cmp dx, 147
+    cmp dx, 147             ; button 5 (credits)
     jae skipButton5
     
     call rollCredits
@@ -2061,7 +2247,7 @@ clickMenu proc
              
     cmp dx, 155
     jbe skipButton6
-    cmp dx, 171
+    cmp dx, 171             ; button 6 (exit)
     jae skipButton6
     
     call returnOs
@@ -2071,6 +2257,54 @@ clickMenu proc
     inc ah
     ret
 clickMenu endp
+
+;*****************************************************************
+; keyMenu - Key main menu
+; descricao: Implements the keyboard for the main menu 
+; input - al, input from keyboard   
+; output - dx, location in the y position of the screen of the button mapped to that key
+; destroy - dx
+;*****************************************************************
+keyMenu proc
+    xor dx, dx           ; dependendo do valor de al, vamos mudar o valor de dx vai ser 
+                         ; mudado para o valor da posicao do botao correspondente no ecra
+    cmp al, '1'
+    jne stratSwitch1     ; button 1 (play)
+        mov dx, 40
+    stratSwitch1:
+    
+    cmp al, '2'
+    jne stratSwitch2     ; button 2 (load)
+        mov dx, 70
+    stratSwitch2:
+    
+    cmp al, '3'
+    jne stratSwitch3     ; button 3 (save)
+        mov dx, 90
+    stratSwitch3:
+    
+    cmp al, '4'
+    jne stratSwitch4     ; button 4 (top 5)
+        mov dx, 110
+    stratSwitch4:
+    
+    cmp al, '5'
+    jne stratSwitch5     ; button 5 (credits)
+        mov dx, 140
+    stratSwitch5:
+    
+    cmp al, '6'
+    jne stratSwitch6     ; button 6 (exit)
+        mov dx, 160
+    stratSwitch6:
+    
+    cmp al, 1BH
+    jne stratSwitch7     ; button 6 (exit)
+        mov dx, 160
+    stratSwitch7:
+    
+    ret
+keyMenu endp
 
 ;*****************************************************************
 ; stratMenu - Game main menu
@@ -2090,42 +2324,7 @@ startMenu proc
         call getCharFromBuffer
         jz startMousePos
             
-            xor dx, dx           ; dependendo do valor de al, vamos mudar o valor de dx vai ser 
-                                 ; mudado para o valor da posicao do botao correspondente no ecra
-            cmp al, '1'
-            jne stratSwitch1
-                mov dx, 40
-            stratSwitch1:
-            
-            cmp al, '2'
-            jne stratSwitch2
-                mov dx, 70
-            stratSwitch2:
-            
-            cmp al, '3'
-            jne stratSwitch3
-                mov dx, 90
-            stratSwitch3:
-            
-            cmp al, '4'
-            jne stratSwitch4
-                mov dx, 110
-            stratSwitch4:
-            
-            cmp al, '5'
-            jne stratSwitch5
-                mov dx, 140
-            stratSwitch5:
-            
-            cmp al, '6'
-            jne stratSwitch6
-                mov dx, 160
-            stratSwitch6:
-            
-            cmp al, 1BH
-            jne stratSwitch7
-                mov dx, 160
-            stratSwitch7:
+            call keyMenu
             
             or dx, dx
             jz startLoop 
@@ -2158,4 +2357,5 @@ startMenu proc
     ret
 startMenu endp
   
-end start ; set entry point and stop the assembler.
+end start
+ ; set entry point and stop the assembler.
