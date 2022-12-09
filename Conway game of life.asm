@@ -7,6 +7,7 @@ data segment
 	MAXPLAYERNAME equ 11
 	MAXLOGSTRSIZE equ MAXPLAYERNAME + 26
     MAXBUFFERSIZE equ (MAXLOGSTRSIZE * 4) + 2
+    PIXELDIVCONST equ 1111111111111110b
       
     strOpenError db "Error on open: $"                          ;file errors
     strCreateError db "Error on create: $"
@@ -49,8 +50,8 @@ data segment
     TopFile db "C:\ConwayGa\Top5.txt", 0
     filesPath db "C:\ConwayGa\", 0
     strTop5Screen db "Gen Cells   Player   Date    Time$"
-    strGetPlayerName db "Enter username: $"
-    strGetSaveName db "Enter save file name: $"
+    strGetPlayerName db "Enter  username:$"
+    strGetSaveName db "Enter save  file name:$"
     strSaving db "SAVING...$"
     strDiogo db "Diogo Matos Novais  n", 0A7h, " 62506$"
     strFilipe db "Filipe Silva Cavalheiro n", 0A7h, " 62894$"
@@ -72,6 +73,7 @@ start:
     mov ax, data
     mov ds, ax
     mov es, ax
+    
     call initGraph     
     call initMouse
     
@@ -88,7 +90,7 @@ ends
 ; description: starts the graph interface 
 ; input - none
 ; output - Graph interface on the screen
-; destroy - nothing
+; destroy - ax
 ;*****************************************************************
 initGraph proc
     xor ah, ah
@@ -102,16 +104,16 @@ initGraph endp
 ; description: rotine that clears the screen 
 ; input - none
 ; output - none
-; destroy - nothing
+; destroy - bx, cx, dx
 ;*****************************************************************
 clearGraph proc
     push ax
 	mov ah,06
 	mov al,00
-	mov BH,00   ; attributes to be used on blanked lines
+	mov bh,00   ; attributes to be used on blanked lines
 	mov cx,0    ; CH,CL = row,column of upper left corner of window to scroll
-	mov DH,25   ;= row,column of lower right corner of window
-	mov DL,40
+	mov dh,25   ;= row,column of lower right corner of window
+	mov dl,40
 	int 10h
 	pop ax
 	ret
@@ -126,7 +128,7 @@ clearGraph endp
 ;         dl - coluna
 ;         bh - pagina ativa  
 ; output - nada
-; destroi - cx e dx
+; destroi - nada
 ;*****************************************************************     
 setCursorPosition proc
     push ax                  
@@ -166,7 +168,7 @@ getCursorSizePosition endp
 ; description: starts the mouse 
 ; input - none
 ; output - none
-; destroy - nothing
+; destroy - ax
 ;*****************************************************************
 initMouse proc
     xor ax, ax
@@ -181,7 +183,7 @@ initMouse endp
 ; output - BX = Button pressed (1 - botao da esquerda, 2 - botao da direita e  3 ambos os botoes)
 ; 	       CX = horizontal position (column)
 ; 	       DX = Vertical position (row)
-; destroy - nothing
+; destroy - bx, cx, dx
 ;*****************************************************************
 getMousePos proc
     push ax
@@ -225,7 +227,7 @@ hideMouseCursor endp
 ; description: routine that creates a directory 
 ; input - dx - file location and name
 ; output - none
-; destroy - bx, dx, ax
+; destroy - ax
 ;*****************************************************************
 createDir proc
     
@@ -241,7 +243,7 @@ createDir endp
 ; input - cx - file attribute
 ;         dx - file location and name
 ; output - none
-; destroy - bx, dx, ax
+; destroy - ax, bx, dx (maybe)
 ;*****************************************************************
 fcreate proc
                          
@@ -266,7 +268,7 @@ fcreate endp
 ; input - al - open mode (0 - readOnly, 1 - writeOnly, 2 - readWrite, 3 - append(WriteOnly))
 ;         dx - file location and name
 ; output - bx - file handler or jc if error and ax, error code
-; destroy - dx, cx, ax
+; destroy - ax, bx, cx, dx
 ;*****************************************************************
 fopen proc
     
@@ -305,7 +307,7 @@ fopen endp
 ;         bx - file handler
 ;         cx:dx - distance from origin
 ; output - DX:AX - new handler position (from start of file)
-; destroy - dx
+; destroy - ax, cx, dx
 ;*****************************************************************
 fseek proc
     mov ah, 42h
@@ -326,7 +328,7 @@ fseek endp
 ;         cx, number of bytes to read
 ;         dx, pointer to where to store the data
 ; output - dx, data in the position pointed by 
-; destroy - dx (maybe)
+; destroy - ax, dx (maybe)
 ;*****************************************************************
 fread proc
     
@@ -348,7 +350,7 @@ fread endp
 ;         cx, number of bytes to write
 ;         dx, pointer to data to write
 ; output - nothing 
-; destroy - dx (maybe)
+; destroy - ax dx (maybe)
 ;*****************************************************************
 fwrite proc
         
@@ -368,7 +370,7 @@ fwrite endp
 ; description: routine that closes file
 ; input - bx - file handler
 ; output - nada
-; destroy - dx
+; destroy - ax, dx (maybe)
 ;*****************************************************************    
 fclose proc
     mov ah, 3eh
@@ -390,7 +392,7 @@ fclose endp
 ; output - ax, number of bytes read
 ;          strTemp, string read
 ;          carry flag if end of file
-; destroi - dx, cx, si
+; destroi - cx, dx, si
 ;*****************************************************************
 fReadLine proc
     push bp
@@ -501,7 +503,7 @@ strLen endp
 ; input - si, start of the string
 ;         cx, length of the string
 ; output - nenhum
-; destroi - cx, dl 
+; destroi - cx, dl, si 
 ;*****************************************************************       
 shiftStrRight proc
     
@@ -525,7 +527,7 @@ shiftStrRight endp
 ;         cx, lenght of string
 ;         bx, desired length of the string 
 ; output - nenhum
-; destroi - cx 
+; destroi - bx, cx 
 ;*****************************************************************
 assertStrLen proc
     push si
@@ -586,26 +588,11 @@ printf proc
 printf endp
 
 ;*****************************************************************
-; ci - input character
-; descricao: Le um input do utilizador
-; input - nada   
-; output - al, caracter recebido
-; destroi - ax
-;*****************************************************************    
-ci proc
-        
-    mov ah, 7
-    int 21h
-    
-    ret    
-ci endp
-
-;*****************************************************************
 ; co - caracter output
 ; descricao: rotina que faz o output de um caracter para o ecra
 ; input - al=caracter a escrever
 ; output - nenhum
-; destroi - nada
+; destroi - ax, dx
 ;*****************************************************************
 co proc
     mov ah,02H
@@ -620,14 +607,12 @@ co endp
 ; input - DI = deslocamento da string a escrever desde o inicio do segmento de dados
 ;         CX = max number of chars
 ; output - string
-; destroi - ax, cx, dx, di
+; destroi - ax, bx, cx, dx, di
 ;*****************************************************************
 scanf proc
     mov bx, cx
     
     ScanLoop:
-        or cx, cx
-        jz endScan
     
         call getCharFromBuffer
         jz ScanLoop
@@ -664,6 +649,9 @@ scanf proc
             jmp ScanLoop
         NotBackSpace:
         
+        or cx, cx
+        jz ScanLoop
+        
         call co
         
         mov [di], al
@@ -682,7 +670,7 @@ scanf endp
 ; input - SI = start of string to conver
 ;         cx = number of bytes to convert
 ; output - AX, converted number
-; destroi - ax, bx, 
+; destroi - ax, dx, si 
 ;*****************************************************************
 strToNum proc
     push bx
@@ -711,7 +699,7 @@ strToNum endp
 ; input - SI = start of string
 ;         AX = number to be printed
 ; output - nenhum
-; destroi - cx, dx, ax
+; destroi - ax, cx, dx, si
 ;*****************************************************************
 numToStr proc
     push bx
@@ -782,7 +770,7 @@ copyToStr endp
 ; input - di = where to start clearing the string 
 ;         cx = number of bytes to clear from string
 ; output - nenhum
-; destroi - cx 
+; destroi - al, cx 
 ;*****************************************************************
 clearString proc
     push di
@@ -802,7 +790,7 @@ clearString endp
 ;         bx, desired length of the string to copy
 ;         ax, number to convert to string 
 ; output - nenhum
-; destroi - cx 
+; destroi - ax, cx, dx, di
 ;*****************************************************************
 processIntStr proc   
     push si
@@ -876,7 +864,7 @@ insertDateInStr endp
 ; descricao: routine that inserts current time in string
 ; input - di, place of string to inster in
 ; output - di, current position in input string after insertion
-; destroi - cx, di, dx, ax, bx 
+; destroi - ax, bx, cx, dx, di 
 ;*****************************************************************
 insertTimeInStr proc
     
@@ -938,7 +926,7 @@ checkPixel endp
 ; description: draws a line starting in cx until MAXCOLLUM 
 ; input - none
 ; output - line on the screen
-; destroy - cx
+; destroy - al, dx, cx
 ;*****************************************************************
 drawLine proc
     mov al, GRIDCOLOR
@@ -963,7 +951,7 @@ drawLine endp
 ;         push 5 - posicao estatica final
 ;         push 6 - di (incremento do sentido)   
 ; output - nenhum
-; destroi - cx
+; destroi - ax, cx, dx
 ;*****************************************************************    
 paint2PixelsX proc
     push bp
@@ -1003,7 +991,7 @@ paint2PixelsX endp
 ;         push 5 - posicao estatica final
 ;         push 6 - di (incremento do sentido)   
 ; output - nenhum
-; destroi - cx
+; destroi - ax, cx, dx
 ;*****************************************************************    
 paint2PixelsY proc
     push bp
@@ -1042,7 +1030,7 @@ paint2PixelsY endp
 ;         push 4 - posicao x final
 ;         push 5 - posicao y final   
 ; output - nenhum
-; destroi - cx
+; destroi - ax, cx, dx
 ;*****************************************************************
 paintSquare proc
     push bp
@@ -1102,7 +1090,7 @@ paintSquare endp
 ;         push 1 - color of the square
 ;         push 2 - center of y position  
 ; output - codigo ascii da tecla pressionada em al
-; destroi - ax
+; destroi - ax, dx
 ;*****************************************************************    
 constructButtonCenterX proc
     push bp
@@ -1183,7 +1171,7 @@ paintMenuSqrs endp
 ;         DX = y start position
 ;         AL = squareColor
 ; output - square on the screen
-; destroi - nothing
+; destroi - cx, dx
 ;*****************************************************************
 drawFilledSquare proc
     push bp
@@ -1217,7 +1205,7 @@ drawFilledSquare endp
 ; description: prints the header of the grid
 ; input - none
 ; output - string on ehader zone
-; destroy - nothing
+; destroy - ax, bx, dx, si
 ;*****************************************************************
 printfHeader proc
     xor dx, dx
@@ -1272,7 +1260,7 @@ printfHeader endp
 ; description: final state of the game
 ; input - none
 ; output - none
-; destroy - 
+; destroy - ax, bx, cx, dx
 ;*****************************************************************
 startGame proc
     startGameLoop1:
@@ -1314,7 +1302,7 @@ startGame endp
 ; description:
 ; input - none
 ; output - none
-; destroy - ax, bx, cx, dx
+; destroy - ax, bx, cx, dx, si
 ;*****************************************************************
 clickGrid proc
     clickGridLoop1:
@@ -1361,9 +1349,9 @@ clickGrid proc
     cmp dx, MAXLINE+2     ;dont draw if dx is >= 200
     jae clickGridLoop1
            
-    and cx, 1111111111111110b
+    and cx, PIXELDIVCONST
     
-    and dx, 1111111111111110b
+    and dx, PIXELDIVCONST
     
     mov bh, SQUARECOLOR
     inc cellNum
@@ -1387,7 +1375,7 @@ clickGrid endp
 ; description: draws the pixel accordingly with var nextGen
 ; input - none
 ; output - none
-; destroy - nothing
+; destroy - ax, cx, dx, si
 ;*****************************************************************
 drawNextGen proc
     mov dx, LIMITLINE+1
@@ -1559,7 +1547,7 @@ storeNextGen endp
 ;          cx - ano
 ;          dh - mes
 ;          dl - dia
-; destroi - cx e dx
+; destroi - cx, dx
 ;*****************************************************************           
 getSystemDate proc
     push ax
@@ -1580,7 +1568,7 @@ getSystemDate endp
 ;          cl - minuto
 ;          dh - segundo
 ;          dl - centesima
-; destroi - cx e dx
+; destroi - cx, dx
 ;*****************************************************************       
 getSystemTime proc
     push ax
@@ -1598,7 +1586,7 @@ getSystemTime endp
 ; input - bx, file handler
 ;         dx, position you wish to start deleting from  
 ; output - nothing
-; destroy - cx, dx
+; destroy - ax, cx, dx
 ;*****************************************************************
 clearRestOfFile proc
     push dx
@@ -1742,20 +1730,6 @@ writeRelScor proc
     ret
 writeRelScor endp
 
-
-;*****************************************************************
-; returnOs - returns to operating system
-; descricao: routine that returns control to the opperating system
-; input - nada  
-; output - nada
-; destroi - everything
-;*****************************************************************    
-returnOs proc
-    mov ax, 4c00h
-    int 21h
-    ret
-returnOs endp
-
 ;*****************************************************************
 ; waitOrInput - wait 10 seconds or for user inpur
 ; descricao: rotine waits 10 seconds before ending or waits for user input instead
@@ -1790,7 +1764,7 @@ waitOrInput endp
 ; description: routine handles file errors
 ; input - nada
 ; output - nada
-; destroy - dl
+; destroy - dx
 ;*****************************************************************
 ErrorHandler proc
     push bx
@@ -1933,7 +1907,7 @@ printMenuStr endp
 ; descricao: routine that Builds strings for the log file
 ; input - nothing
 ; output - di, end of Log string
-; destroi - si, cx, di, dx, ax, bx 
+; destroi - ax, bx, cx, dx, si, di 
 ;*****************************************************************
 buildLogStr proc
     
@@ -2019,7 +1993,7 @@ openLogFile endp
 ; description: routine that writes a log entry 
 ; input - bx, file to write the log
 ; output - nothing 
-; destroy - ax, bx, cx, dx, si, di
+; destroy - ax, cx, dx, si, di
 ;*****************************************************************  
 writeLog proc
     
@@ -2077,7 +2051,7 @@ openTop5 endp
 ; descricao: rotine that calculates the points a user has from a string with the same structure as the log string
 ; input - si, beggining of the string  
 ; output - ax, user points
-; destroi - si, dx, ax, cx
+; destroi - ax, cx, dx, si
 ;*****************************************************************
 calcPointsFromLog proc
 
@@ -2175,7 +2149,7 @@ calcNewTop5 endp
 ; input - bx, file handler
 ;         dx, position to write in file  
 ; output - dx, last position writen to file (from beggining)
-; destroy - cx, dx, si
+; destroy - ax, cx, dx, si
 ;*****************************************************************
 appendToTop5 proc
     push dx
@@ -2202,7 +2176,7 @@ appendToTop5 endp
 ; descricao: rotine that sees if the new player should be part of the top 5 file
 ; input - bx, file handler  
 ; output - nada
-; destroy - bx, cx, dx, si, di
+; destroy - ax, bx, cx, dx, si, di
 ;*****************************************************************
 checkTop5 proc
     push bp
@@ -2268,13 +2242,13 @@ initGamePlay proc
     call clearGraph
     
     xor bx, bx
-    mov dx, 0B0BH
+    mov dx, 0B0CH
     call setCursorPosition
     
     lea dx, strGetPlayerName
     call printf
     
-    mov dx, 0C0EH
+    mov dx, 0C0FH
     call setCursorPosition
     
     mov cx, MAXPLAYERNAME-1
@@ -2310,7 +2284,7 @@ initGamePlay endp
 ; descricao: save the gam ein memory (last one)
 ; input - nothing  
 ; output - .gam file in directory
-; destroi -
+; destroi - bx, cx, dx, si
 ;*****************************************************************
 saveGame proc
     push ax
@@ -2384,13 +2358,13 @@ saveGame endp
 ; descricao: 
 ; input -   
 ; output - 
-; destroi -
+; destroi - bx, cx, dx, si, di
 ;*****************************************************************
 loadGame proc
     push ax
     call clearGraph
     xor bx, bx
-    mov dx, 0B0DH
+    mov dx, 0B09H
     call setCursorPosition
     
     lea dx, strGetSaveName
@@ -2399,7 +2373,7 @@ loadGame proc
     mov dx, 0C0EH
     call setCursorPosition 
     
-    mov cx, MAXPLAYERNAME + 14 ; strPlayerName + DATE + TIME 
+    mov cx, 12 ; strPlayerName + DATE + TIME 
     lea di, strSaveName
     call scanf
     jc loadGameEnd1
@@ -2433,84 +2407,84 @@ loadGame proc
 loadGame endp
 
 ;*****************************************************************
-; processTop5Str - 
-; description: 
-; input -   
-; output - 
-; destroi - 
+; processTop5Str - process top 5 string
+; description: takes a log type string and creates a string to print in top 5
+; input - dx, place of the string to use as temporary storage  
+; output - strTemp string to be printed with printf
+; destroi - ax, cx, dx, di, si
 ;*****************************************************************
 processTop5Str proc
     
     mov si, dx
-        sub si, 9
-        mov cx, 3
-        lea di, strTemp
+    sub si, 9
+    mov cx, 3
+    lea di, strTemp
+    
+    rep movsb
+    
+    mov cx, 4
+    inc si
+    inc di
+    
+    rep movsb
+    
+    sub si, 9
+    
+    xor ax, ax
+    skipReadUserName:
+        inc ax
+        dec si
+        cmp [si], ':'
+        jne skipReadUserName
+    
+    add di, 2
+    inc si
+    dec ax
+    push si
+    
+    mov cx, ax 
+    rep movsb
+    
+    pop si
+    
+    sub si, 14
         
-        rep movsb
-        
-        mov cx, 4
-        inc si
-        inc di
-        
-        rep movsb
-        
-        sub si, 9
-        
-        xor ax, ax
-        skipReadUserName:
-            inc ax
-            dec si
-            cmp [si], ':'
-            jne skipReadUserName
-        
-        add di, 2
-        inc si
-        dec ax
-        push si
-        
-        mov cx, ax 
-        rep movsb
-        
-        pop si
-        
-        sub si, 14
+    mov dx, MAXPLAYERNAME
+    sub dx, ax
+    add di, dx
+    mov cx, 2
+    rep movsb
+    
             
-        mov dx, MAXPLAYERNAME
-        sub dx, ax
-        add di, dx
-        mov cx, 2
-        rep movsb
-        
-                
-        mov [di], '\'
-        inc di
-        
-        mov cx, 2
-        rep movsb
-        
-        mov [di], '\'
-        inc di
-        
-        mov cx, 2
-        rep movsb
-        
-        inc si
-        inc di
-        mov cx, 2
-        rep movsb
-        
-        mov [di], ':'
-        inc di
-        
-        mov cx, 2
-        rep movsb
-        
-        mov [di], ':'
-        inc di
-        
-        mov cx, 2
-        rep movsb
-        mov [di], '$'
+    mov [di], '\'
+    inc di
+    
+    mov cx, 2
+    rep movsb
+    
+    mov [di], '\'
+    inc di
+    
+    mov cx, 2
+    rep movsb
+    
+    inc si
+    inc di
+    mov cx, 2
+    rep movsb
+    
+    mov [di], ':'
+    inc di
+    
+    mov cx, 2
+    rep movsb
+    
+    mov [di], ':'
+    inc di
+    
+    mov cx, 2
+    rep movsb
+    mov [di], '$'
     
     ret
 processTop5Str endp    
@@ -2520,7 +2494,7 @@ processTop5Str endp
 ; descricao: rotine that displays the top 5 saves
 ; input - nada  
 ; output - nada
-; destroi - dx, bx
+; destroi - bx, cx, dx, si, di
 ;*****************************************************************
 displayTop5 proc
     push bp
@@ -2678,12 +2652,11 @@ clickMenu proc
     cmp dx, 171
     jae skipButton6
     
-    STC
+    add ah, 2
     ret
     skipButton6:
     
     inc ah
-    CLC
     ret
 clickMenu endp
 
@@ -2728,7 +2701,7 @@ keyMenu proc
     stratSwitch6:
     
     cmp al, 1BH
-    jne stratSwitch7     ; button 6 (exit)
+    jne stratSwitch7     ; button esc (exit)
         mov dx, 160
     stratSwitch7:
     
@@ -2740,7 +2713,7 @@ keyMenu endp
 ; descricao: Creates and opens the main menu 
 ; input - nada   
 ; output - ah
-; destroy - dx, bx
+; destroy - ax, dx, bx
 ;*****************************************************************     
 startMenu proc
     
@@ -2780,7 +2753,8 @@ startMenu proc
             
             startCLick:
             call clickMenu
-            jc endStartLoop
+            cmp ah, 2
+            je endStartLoop
             
             or ah, ah
             jz startRefreshScreen
