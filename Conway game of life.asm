@@ -2733,7 +2733,7 @@ startMenu proc
             call keyMenu
             
             or dx, dx
-            jz startLoop 
+            jz startMousePos 
             
             jmp startClick
         
@@ -2744,12 +2744,12 @@ startMenu proc
         shr cx, 1
          
         cmp bl, 1
-        jne startSkipButtons
+        jne startLoop
             
             cmp cx, 119             ; como os quadrados tem todos a mesma posicao no eixo x
-            jbe startSkipButtons    ; so e preciso verificar 1 vez se estamos no sitio certo para clicar nos
+            jbe startLoop           ; so e preciso verificar 1 vez se estamos no sitio certo para clicar nos
             cmp cx, 199             ; quadrados antes de verificar o quadrado que estamos a clicar
-            jae startSkipButtons
+            jae startLoop
             
             startCLick:
             call clickMenu
@@ -2758,8 +2758,7 @@ startMenu proc
             
             or ah, ah
             jz startRefreshScreen
-             
-        startSkipButtons:        
+                                 
         jmp startLoop
     endStartLoop:
     
