@@ -50,9 +50,9 @@ data segment
     TopFile db "C:\ConwayGa\Top5.txt", 0
     filesPath db "C:\ConwayGa\", 0
     strTop5Screen db "Gen Cells   Player   Date    Time$"
-    strGetPlayerName db "Enter  username:$"
-    strGetSaveName db "Enter save  file name:$"
-    strSaving db "SAVING...$"
+    strGetPlayerName db "Enter username: $"
+    strGetSaveName db "Enter save file name: $"
+    strSaving db "SAVING....$"
     strDiogo db "Diogo Matos Novais  n", 0A7h, " 62506$"
     strFilipe db "Filipe Silva Cavalheiro n", 0A7h, " 62894$"
     strLog db 28 dup(0), MAXPLAYERNAME dup(0), 0DH, 0AH, 0 
@@ -73,7 +73,6 @@ start:
     mov ax, data
     mov ds, ax
     mov es, ax
-    
     call initGraph     
     call initMouse
     
@@ -350,7 +349,7 @@ fread endp
 ;         cx, number of bytes to write
 ;         dx, pointer to data to write
 ; output - nothing 
-; destroy - ax dx (maybe)
+; destroy - ax, dx(in case of error)
 ;*****************************************************************
 fwrite proc
         
@@ -370,7 +369,7 @@ fwrite endp
 ; description: routine that closes file
 ; input - bx - file handler
 ; output - nada
-; destroy - ax, dx (maybe)
+; destroy - ax, dx(in case of error)
 ;*****************************************************************    
 fclose proc
     mov ah, 3eh
@@ -1030,7 +1029,7 @@ paint2PixelsY endp
 ;         push 4 - posicao x final
 ;         push 5 - posicao y final   
 ; output - nenhum
-; destroi - ax, cx, dx
+; destroi - cx
 ;*****************************************************************
 paintSquare proc
     push bp
@@ -1269,14 +1268,14 @@ startGame proc
     call printfHeader
     inc genNum
     cmp genNum, 999
-    je startGameEnd2
+    je startGameEnd1
     
     call getCharFromBuffer  ; end game by pressing 'q'
-    jz startGameEnd1
+    jz startGameIf1
     cmp al, 'q'         
-    jne startGameEnd1
-    ret
-    startGameEnd1:    
+    jne startGameIf1
+    jmp startGameEnd1
+    startGameIf1:    
     
     call getMousePos
     cmp bx, 01              ; on left click
@@ -1293,7 +1292,7 @@ startGame proc
     cmp cx, 302
     ja startGameLoop1
     
-    startGameEnd2:
+    startGameEnd1:
     ret
 startGame endp
 
@@ -1315,8 +1314,8 @@ clickGrid proc
     clickGridIf1:
     cmp al, 0DH             ; press ENTER       
     jne clickGridEnd2    
-    call startGame 
-    jmp clickGridEnd3
+    call startGame
+    ret 
     
     clickGridEnd2:    
     call getMousePos
@@ -1365,8 +1364,7 @@ clickGrid proc
     call drawFilledSquare
     call printfHeader
     jmp clickGridLoop1
-    
-    clickGridEnd3:    
+        
     ret
 clickGrid endp 
 
@@ -2191,7 +2189,7 @@ checkTop5 proc
     
     jnc WriteOver:
         
-        cmp cx, 5
+        cmp cx, 6
         je endCheckTop5
                                                
         call appendToTop5           ; write to file
@@ -2299,8 +2297,7 @@ saveGame proc
     
     lea si, strPlayerName
     xor dx,dx
-    call strLen
-    mov ax, cx              ; strPlayerName
+    call strLen              
     
     cmp cx, 2
     jbe saveGameIf1
@@ -2310,7 +2307,6 @@ saveGame proc
     lea di, saveFile1       
     add di, 12                                   
     rep movsb               ; C:\ConwayGame\ + strPlayerName              
-    add ax, 14
     
     call getSystemDate      ;dh = Month, dl = day   
     push dx
@@ -2355,9 +2351,9 @@ saveGame endp
 
 ;*****************************************************************
 ; loadGame - Load Game
-; descricao: 
-; input -   
-; output - 
+; descricao: Loads the game and start it from where it was left off
+; input - none  
+; output - none 
 ; destroi - bx, cx, dx, si, di
 ;*****************************************************************
 loadGame proc
@@ -2373,7 +2369,7 @@ loadGame proc
     mov dx, 0C0EH
     call setCursorPosition 
     
-    mov cx, 12 ; strPlayerName + DATE + TIME 
+    mov cx, 8                   ; strPlayerName + Month + day + minutes 
     lea di, strSaveName
     call scanf
     jc loadGameEnd1
@@ -2383,7 +2379,7 @@ loadGame proc
     call strLen
     lea si, strSaveName
     lea di, saveFile1
-    add di, 14                        
+    add di, 12                        
     rep movsb
     
     lea si, saveFile2
@@ -2392,12 +2388,22 @@ loadGame proc
     
     mov al, 2
     lea dx, saveFile1
-    call fopen
+    call fopen 
+    jnc loadGameNoOpenError
+        call clearGraph
+        xor bx, bx
+        mov dx, 0B0FH
+        call setCursorPosition
+        call ErrorHandler
+        call waitOrInput
+        jmp loadGameEnd1        
+    loadGameNoOpenError:
     mov cx, 15215
     lea dx, strPlayerName
     call fread
     call fclose
     
+    call showMouseCursor
     call drawNextGen        ; Draw pixels of a loaded state
     call startGame
     
@@ -2598,7 +2604,7 @@ rollCredits endp
 ; input - dx   
 ; output - nada
 ; destroy - dx, bx
-;*****************************************************************
+;*********************************************************************
 clickMenu proc
     xor ah, ah          
     
@@ -2701,7 +2707,7 @@ keyMenu proc
     stratSwitch6:
     
     cmp al, 1BH
-    jne stratSwitch7     ; button esc (exit)
+    jne stratSwitch7     ; button 6 (exit)
         mov dx, 160
     stratSwitch7:
     
@@ -2714,7 +2720,7 @@ keyMenu endp
 ; input - nada   
 ; output - ah
 ; destroy - ax, dx, bx
-;*****************************************************************     
+;*****************************************************************       
 startMenu proc
     
     startRefreshScreen:
@@ -2763,6 +2769,5 @@ startMenu proc
     endStartLoop:
     
     ret
-startMenu endp
   
 end start ; set entry point and stop the assembler.
