@@ -2212,13 +2212,13 @@ checkTop5 proc
         mov di, [bp - 4]
         call writeRelScor
         
-        pop dx
-        
-        lea si, strTemp
-        mov cx, MAXBUFFERSIZE
-        call clearString        
+        pop dx        
         
     endCheckTop5:
+    
+    lea di, strTemp
+    mov cx, MAXBUFFERSIZE
+    call clearString
     
     call clearRestOfFile
    
@@ -2235,7 +2235,12 @@ checkTop5 endp
 ; destroi - bx, cx, dx, si, di
 ;*****************************************************************
 initGamePlay proc
-    push ax 
+    push ax
+    
+    mov cx, MAXPLAYERNAME
+    lea di, strPlayerName
+    call clearString
+     
     call hideMouseCursor
     call clearGraph
     
@@ -2260,7 +2265,7 @@ initGamePlay proc
     call showMouseCursor
     call printfHeader
     call drawLine
-    call clickGrid
+    call clickGrid  
     
     call openLogFile    
     call writeLog
@@ -2270,6 +2275,10 @@ initGamePlay proc
     call openTop5
     call checkTop5
     call fclose
+    
+    mov cx, MAXLOGSTRSIZE
+    lea di, strLog
+    call clearString
     
     endInitGame:
     
