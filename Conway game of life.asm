@@ -74,7 +74,7 @@ start:
     mov ds, ax
     mov es, ax
     call initGraph     
-    call initMouse
+    call initMouse 
     
     call startMenu
          
@@ -507,6 +507,8 @@ strLen endp
 shiftStrRight proc
     
     add si, cx
+    or cx, cx
+    jz shiftStrRightEnd1
     
     shiftStrRightLoop:
     
@@ -515,6 +517,7 @@ shiftStrRight proc
         dec si    
     
     loop shiftStrRightLoop
+    shiftStrRightEnd1:
      
     ret
 shiftStrRight endp
@@ -1265,16 +1268,20 @@ startGame proc
     startGameLoop1:
     call storeNextGen  
     call drawNextGen
+    
     call printfHeader
     inc genNum
     cmp genNum, 999
     je startGameEnd1
     
+    cmp cellNum, 0
+    jz startGameEnd1
+    
     call getCharFromBuffer  ; end game by pressing 'q'
     jz startGameIf1
     cmp al, 'q'         
     jne startGameIf1
-    jmp startGameEnd1
+    ret
     startGameIf1:    
     
     call getMousePos
@@ -1537,13 +1544,13 @@ storeNextGen proc
 storeNextGen endp
 
 
+;          dh - mes 
 ;*****************************************************************
 ; getSystemDate - Gets system date
 ; descricao: rotine that gets the system date
 ; input - nada  
 ; output - Ano, dia e mes
 ;          cx - ano
-;          dh - mes
 ;          dl - dia
 ; destroi - cx, dx
 ;*****************************************************************           
@@ -2413,8 +2420,10 @@ loadGame proc
     call fclose
     
     call showMouseCursor
+    call printfHeader
+    call drawLine
     call drawNextGen        ; Draw pixels of a loaded state
-    call startGame
+    call clickGrid
     
     loadGameEnd1:
     pop ax
